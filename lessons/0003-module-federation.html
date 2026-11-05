@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module Federation вживую</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps > li { counter-increment: s; position: relative; padding-left: 2.1rem; margin-bottom: 1.4rem; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--sans); font-size: .72rem; font-weight: 600; display: grid; place-items: center; }
+  .steps pre { margin: .5rem 0 .6rem; }
+  .predict { font-family: var(--sans); font-size: .78rem; color: var(--accent); font-weight: 600; }
+  details { border: 1px solid var(--rule); border-radius: 10px; padding: .9rem 1.1rem; background: var(--surface); margin: 1rem 0; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  details[open] summary { margin-bottom: .8rem; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .8rem; }
+  .pair pre { margin: 0; height: 100%; }
+  .pair .cap { font-family: var(--sans); font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 .3rem; }
+</style>
+</head>
+<body>
+<main>
+
+<p class="kicker">Урок 3 · Микрофронтенды</p>
+<h1>Module Federation: как микрофронтенд попадает на страницу</h1>
+<p class="lede">До сих пор «Полка» жила в одном файле. Теперь это три настоящих приложения с отдельными сборками и серверами: Shell и Каталог на React, Корзина на Vue. После урока вы сможете прочитать конфиг Module Federation, объяснить <code>host</code>, <code>remote</code>, <code>exposes</code> и <code>shared</code> и показать, что ломается без <code>singleton</code>.</p>
+
+<h2>Разминка: вспомните урок 2</h2>
+<p>Назовите по памяти четыре проблемы синхронизации состояния и приём для каждой. Потом кликните по размытому тексту.</p>
+<p class="reveal" tabindex="0">1) Компонент выгрузили, и данные пропали → состояние живёт у владельца дольше компонента. 2) Опоздавший подписчик → снимок вместо дельты и рукопожатие <code>state-request</code>. 3) Действие потерялось → подтверждение через <code>preventDefault()</code>. 4) Вкладки разъехались → владелец синхронизирует себя через BroadcastChannel.</p>
+
+<h2>Какую задачу решает Module Federation</h2>
+<p>Каноническая статья называет основным способом сборки микрофронтендов <em>runtime-интеграцию через JavaScript</em>: каждый МФ — отдельный бандл со своим адресом, а контейнер подгружает его во время работы страницы<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. Сделать это вручную можно, но быстро появляются вопросы. Как хосту узнать, какие модули есть у remote? Как не скачать React трижды? Как договориться о версиях?</p>
+<p><strong>Module Federation</strong> отвечает на них стандартным способом: это «архитектурный паттерн децентрализации JavaScript-приложений», который позволяет приложениям делиться кодом и зависимостями<a class="cite" href="https://module-federation.io/guide/start/index.html">[2]</a>. Сейчас актуальна версия 2.0 с отдельным рантаймом и манифестом. Она работает с webpack и Rspack, а с Vite — через официальный плагин <code>@module-federation/vite</code><a class="cite" href="https://github.com/module-federation/vite">[3]</a>, который мы и используем.</p>
+
+<h2>Пять слов, на которых всё держится</h2>
+<table>
+  <thead><tr><th>Термин</th><th>Что это</th><th>В «Полке»</th></tr></thead>
+  <tbody>
+    <tr><td><strong>host</strong></td><td>Приложение, которое потребляет чужие модули во время работы</td><td>Shell, порт 5170</td></tr>
+    <tr><td><strong>remote</strong></td><td>Приложение, которое отдаёт свои модули наружу</td><td>Каталог (5171), Корзина (5172)</td></tr>
+    <tr><td><strong>exposes</strong></td><td>Публичный контракт remote: какие модули под какими именами доступны снаружи. Всё остальное — внутреннее</td><td><code>./Catalog</code>, <code>./mount</code></td></tr>
+    <tr><td><strong>remoteEntry.js</strong></td><td>«Витрина» remote: маленький файл, по которому хост узнаёт про его exposes и shared. Рядом лежит <code>mf-manifest.json</code> с тем же описанием в JSON</td><td><code>localhost:5171/remoteEntry.js</code></td></tr>
+    <tr><td><strong>shared</strong></td><td>Зависимости, которые приложения договариваются загрузить один раз и использовать вместе</td><td><code>react</code>, <code>react-dom</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Что происходит в браузере</h2>
+<figure>
+<svg viewBox="0 0 640 340" role="img" aria-label="Последовательность загрузки: Shell загружает remoteEntry Каталога и Корзины, договаривается о React, затем по import() грузит модули Catalog и mount">
+  <style>
+    .t { font: 600 13px Inter, system-ui, sans-serif; fill: var(--ink); }
+    .s { font: 11.5px Inter, system-ui, sans-serif; fill: var(--ink-soft); }
+    .m { font: 11px "JetBrains Mono", monospace; fill: var(--ink); }
+  </style>
+  <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-soft)"/></marker></defs>
+  <rect x="40" y="10" width="140" height="44" rx="8" fill="none" stroke="var(--shell)" stroke-width="2"/>
+  <text x="110" y="30" class="t" text-anchor="middle">Shell · host</text><text x="110" y="46" class="s" text-anchor="middle">:5170 · React</text>
+  <rect x="260" y="10" width="140" height="44" rx="8" fill="none" stroke="var(--catalog)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="330" y="30" class="t" text-anchor="middle">Каталог · remote</text><text x="330" y="46" class="s" text-anchor="middle">:5171 · React</text>
+  <rect x="480" y="10" width="140" height="44" rx="8" fill="none" stroke="var(--cart)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="550" y="30" class="t" text-anchor="middle">Корзина · remote</text><text x="550" y="46" class="s" text-anchor="middle">:5172 · Vue</text>
+  <line x1="110" y1="54" x2="110" y2="330" stroke="var(--rule)" stroke-dasharray="3 4"/>
+  <line x1="330" y1="54" x2="330" y2="330" stroke="var(--rule)" stroke-dasharray="3 4"/>
+  <line x1="550" y1="54" x2="550" y2="330" stroke="var(--rule)" stroke-dasharray="3 4"/>
+
+  <text x="20" y="86" class="s">1</text>
+  <text x="122" y="86" class="m">index.html + MF runtime</text>
+  <text x="20" y="128" class="s">2</text>
+  <line x1="112" y1="132" x2="326" y2="132" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#a3)"/>
+  <text x="122" y="124" class="m">GET remoteEntry.js</text>
+  <line x1="112" y1="160" x2="546" y2="160" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#a3)"/>
+  <text x="342" y="152" class="m">GET remoteEntry.js</text>
+  <text x="20" y="200" class="s">3</text>
+  <rect x="104" y="184" width="232" height="26" rx="5" fill="var(--accent-soft)"/>
+  <text x="114" y="201" class="m">react: singleton → берём у Shell</text>
+  <text x="20" y="250" class="s">4</text>
+  <line x1="112" y1="254" x2="326" y2="254" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#a3)"/>
+  <text x="122" y="246" class="m">import('catalog/Catalog')</text>
+  <text x="20" y="300" class="s">5</text>
+  <line x1="112" y1="304" x2="546" y2="304" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#a3)"/>
+  <text x="342" y="296" class="m">import('cart/mount')</text>
+  <text x="620" y="324" class="s" text-anchor="end">Vue едет внутри</text>
+</svg>
+<figcaption>Это реальная последовательность из вкладки Network: я записал её в headless Chrome на нашем playground. React с порта 5171 не загружается ни разу, Каталог использует React Shell.</figcaption>
+</figure>
+
+<h2>Конфиг: две стороны одного контракта</h2>
+<div class="pair">
+  <div><p class="cap">catalog/vite.config.js · remote</p>
+<pre><code>federation({
+  name: 'catalog',
+  filename: 'remoteEntry.js',
+  exposes: {
+    './Catalog': './src/Catalog.jsx',
+  },
+  shared: {
+    react: { singleton: true },
+    'react-dom': { singleton: true },
+  },
+})</code></pre></div>
+  <div><p class="cap">shell/vite.config.js · host</p>
+<pre><code>federation({
+  name: 'shell',
+  remotes: {
+    catalog: {
+      type: 'module', name: 'catalog',
+      entry: 'http://localhost:5171/remoteEntry.js',
+    },
+  },
+  shared: {
+    react: { singleton: true },
+    'react-dom': { singleton: true },
+  },
+})</code></pre></div>
+</div>
+<p>После этого в Shell работает обычный, на вид, импорт: <code>lazy(() =&gt; import('catalog/Catalog'))</code>. Но он идёт не в <code>node_modules</code>, а по сети на 5171 и в момент вызова. Поэтому Каталог можно передеплоить, не пересобирая Shell. Тип <code>module</code> нужен для ESM-remote на Vite<a class="cite" href="https://github.com/module-federation/vite">[3]</a>.</p>
+
+<h2>Два способа встроить remote</h2>
+<table>
+  <thead><tr><th></th><th>Компонент (Каталог)</th><th>Функция <code>mount(el)</code> (Корзина)</th></tr></thead>
+  <tbody>
+    <tr><td>Что отдаёт remote</td><td>React-компонент</td><td><code>mount(el) → unmount</code></td></tr>
+    <tr><td>Канал «вниз»</td><td>props: <code>&lt;Catalog user={user} /&gt;</code></td><td>аргументы <code>mount</code> или атрибуты узла</td></tr>
+    <tr><td>Требование</td><td>Тот же фреймворк и <em>один экземпляр</em> React (<code>singleton</code>)</td><td>Ничего: хост даёт DOM-узел, а remote внутри может быть на любом фреймворке</td></tr>
+    <tr><td>Цена</td><td>Команды связаны версией фреймворка</td><td>Каждый remote везёт свой рантайм (Vue здесь едет внутри Корзины)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <span class="label">Почему singleton — не оптимизация, а требование</span>
+  <p>Без <code>shared</code> Каталог приносит свою копию React. Shell рендерит его компонент своим <code>react-dom</code>, а хуки Каталога обращаются к <em>другой</em> копии React, где рендер не идёт. Результат я получил на нашем стенде: <code>Cannot read properties of null (reading 'useState')</code>. Документация React называет «больше одной копии React» одной из трёх причин ошибки invalid hook call<a class="cite" href="https://react.dev/warnings/invalid-hook-call-warning">[4]</a>. При <code>singleton</code> и разных версиях загружается более высокая, а сторона с низкой версией получает предупреждение<a class="cite" href="https://module-federation.io/configure/shared.html">[5]</a>.</p>
+</div>
+
+<h2>Лабораторная: playground</h2>
+<p>Всё ниже я прогнал в реальном браузере, включая поломки. В терминале:</p>
+<pre><code>cd playground
+npm install
+npm start        <span class="c"># собрать всё и поднять 3 сервера → http://localhost:5170</span></code></pre>
+<p>Перед каждым шагом сделайте ставку. Размытый текст — ответ.</p>
+
+<ol class="steps">
+  <li><b>Посмотрите на Network.</b> Откройте DevTools → Network, обновите страницу и найдите <code>remoteEntry.js</code> с портов 5171 и 5172. <span class="predict">Загрузится ли React с порта 5171?</span> <span class="reveal" tabindex="0">Нет. Метка Каталога показывает «общий с Shell ✓», а файлов react с 5171 в списке нет. Это singleton в действии.</span></li>
+  <li><b>Независимый деплой.</b> В <code>catalog/src/Catalog.jsx</code> переименуйте «Дюна» в «Дюна (новое издание)», затем:
+<pre><code>npm run build -w catalog</code></pre>
+  Обновите Shell. <span class="predict">Нужно ли пересобирать Shell?</span> <span class="reveal" tabindex="0">Нет. Shell знает только адрес remoteEntry.js, а свежий remoteEntry ссылается на новые чанки. Одна оговорка для прода: сам remoteEntry.js нельзя надолго кэшировать, ведь его имя не меняется между деплоями.</span></li>
+  <li><b>Каталог лежит.</b> Остановите всё (Ctrl+C) и запустите без Каталога:
+<pre><code>npm run preview:no-catalog</code></pre>
+  <span class="predict">Что будет со страницей и с Корзиной?</span> <span class="reveal" tabindex="0">Вместо Каталога появится заглушка «временно недоступен» от <code>RemoteBoundary</code> (error boundary в Shell). Корзина работает. В консоли будет <code>RUNTIME-008: Failed to load script resources</code>, и в ней ссылка на документацию.</span></li>
+  <li><b>Сломайте singleton.</b> Верните Каталог (<code>npm run preview</code>), удалите блок <code>shared</code> из <code>catalog/vite.config.js</code>, выполните <code>npm run build -w catalog</code> и обновите страницу. <span class="predict">Что сломается и где?</span> <span class="reveal" tabindex="0">Каталог упадёт с <code>Cannot read properties of null (reading 'useState')</code>: у него теперь своя копия React. Error boundary покажет заглушку, остальная страница жива. Верните <code>shared</code> и пересоберите Каталог.</span></li>
+</ol>
+
+<p class="aside">Ещё одна находка с этого стенда. Сначала Корзина отправляла в BroadcastChannel <code>items.value</code> и падала с <code>DataCloneError</code>: Vue хранит данные в реактивных <code>Proxy</code>, и structured clone их не переносит. Мораль для собеседования: через границу МФ передаются <em>простые данные</em>, а не внутренние объекты фреймворка. Решение в <a href="../playground/cart/src/CartBadge.vue">CartBadge.vue</a>.</p>
+
+<h2>Проверьте себя</h2>
+<p>Последние два вопроса — из уроков 2 и 1.</p>
+
+<div class="quiz" data-quiz>
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Какой файл хост загружает у remote, чтобы узнать, какие модули тот предоставляет?</p>
+    <button data-key="a">index.html с сервера Каталога</button>
+    <button data-key="b">package.json из репозитория Каталога</button>
+    <button data-key="c">remoteEntry.js с сервера Каталога</button>
+    <button data-key="d">vite.config.js из репозитория Каталога</button>
+    <p class="quiz-explain">remoteEntry.js — это «витрина» remote: какие модули есть в exposes и что нужно из shared. Репозиторий Каталога хосту недоступен и не нужен: связь идёт только через задеплоенные файлы.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt">Команда Каталога исправила текст и задеплоила только Каталог. Что нужно сделать команде Shell?</p>
+    <button data-key="a">Ничего: новая версия подтянется при загрузке</button>
+    <button data-key="b">Пересобрать Shell с новой версией Каталога</button>
+    <button data-key="c">Поднять версию Каталога в package.json Shell</button>
+    <button data-key="d">Перезапустить сервер Shell, чтобы сбросить кэш</button>
+    <p class="quiz-explain">В этом весь смысл runtime-интеграции: Shell знает адрес, а не версию. Если бы Каталог подключался npm-пакетом (build-time интеграция), понадобились бы шаги b и c. Именно поэтому статья не советует такой вариант: релизы становятся синхронными<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt">Shell и Каталог на React, но <code>shared</code> не настроен. Что произойдёт, когда Shell отрендерит <code>&lt;Catalog /&gt;</code>?</p>
+    <button data-key="a">Сборка упадёт с ошибкой конфигурации федерации</button>
+    <button data-key="b">Всё работает, только бандл немного больше</button>
+    <button data-key="c">Shell автоматически отдаст Каталогу свой React</button>
+    <button data-key="d">Хуки упадут: у Каталога свой React</button>
+    <p class="quiz-explain">Ответ «бандл немного больше» был бы верен для способа <code>mount(el)</code>, где каждый рендерит своим React. Но когда компонент рендерит чужой <code>react-dom</code>, две копии React ломают хуки. Мы это видели в шаге 4.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt">Почему Корзина отдаёт наружу <code>mount(el)</code>, а не Vue-компонент?</p>
+    <button data-key="a">Vue-компоненты вообще нельзя отдавать через Module Federation</button>
+    <button data-key="b">Хост на React не умеет рендерить Vue-компоненты</button>
+    <button data-key="c">Функция mount загружается быстрее, чем любой компонент</button>
+    <button data-key="d">Так требует опция exposes в плагине Vite</button>
+    <p class="quiz-explain">Отдать Vue-компонент можно, в README плагина именно такой пример<a class="cite" href="https://github.com/module-federation/vite">[3]</a>, но рендерить его сможет только хост на Vue. <code>mount(el)</code> — контракт, не зависящий от фреймворка: «вот DOM-узел, рисуй как хочешь».</p>
+  </div>
+
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt"><span class="team shell">урок 2</span> Корзина на Vue отправляет <code>items.value</code> в BroadcastChannel и получает <code>DataCloneError</code>. Почему?</p>
+    <button data-key="a">BroadcastChannel не принимает массивы, только строки</button>
+    <button data-key="b">Вкладки открыты на разных портах localhost</button>
+    <button data-key="c">Внутри реактивные Proxy Vue: клонировать нельзя</button>
+    <button data-key="d">Канал закрыт, потому что Корзину выгрузили</button>
+    <p class="quiz-explain">Массивы и объекты канал передаёт без проблем, если это простые данные. Реактивная обёртка Vue (и вложенные в неё объекты) — <code>Proxy</code>, а его structured clone перенести не может. Разные порты дали бы другой origin, но не эту ошибку: сообщение просто никто бы не получил.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt"><span class="team shell">урок 1</span> Сервер Каталога не отвечает, <code>remoteEntry.js</code> не загрузился. Что должен сделать Shell?</p>
+    <button data-key="a">Показать заглушку, остальная страница работает</button>
+    <button data-key="b">Показать белый экран до восстановления</button>
+    <button data-key="c">Перезагружать страницу каждые пять секунд</button>
+    <button data-key="d">Загрузить Каталог из своего node_modules</button>
+    <p class="quiz-explain">Это та же устойчивость, что в уроке 1, только на уровне загрузки кода. В React её даёт error boundary вокруг <code>Suspense</code>, а для <code>mount</code> — <code>.catch()</code> у <code>import()</code>. Оба варианта есть в <a href="../playground/shell/src/App.jsx">shell/src/App.jsx</a>.</p>
+  </div>
+  <p class="quiz-score" aria-live="polite"></p>
+</div>
+
+<h2>Тренировка для собеседования</h2>
+<p>60 секунд, вслух:</p>
+<p><em>«Что такое Module Federation, чем она лучше подключения микрофронтенда npm-пакетом и зачем нужен shared singleton?»</em></p>
+<details>
+  <summary>Образец ответа</summary>
+  <p>Module Federation — это runtime-интеграция: каждый микрофронтенд собирается и деплоится отдельно, публикует <code>remoteEntry.js</code> со списком того, что отдаёт наружу (<code>exposes</code>), а хост по <code>import('catalog/Catalog')</code> загружает этот код по сети во время работы страницы. В отличие от npm-пакета, хосту не нужно пересобираться при каждом релизе remote: он знает адрес, а не версию. <code>shared</code> позволяет загрузить общие зависимости один раз. Для React это требование, а не оптимизация: если хост рендерит компонент remote, а у того своя копия React, хуки падают. Поэтому <code>singleton: true</code>, а при расхождении версий берётся старшая, и рантайм предупреждает. Когда фреймворки разные, remote лучше отдавать функцию <code>mount(el)</code>, а не компонент. Обязательно оборачиваем remote в error boundary, чтобы падение одного не роняло страницу.</p>
+</details>
+
+<div class="source">
+  <span class="label">Главный источник к уроку</span>
+  <p style="margin:0">Официальная документация: <a href="https://module-federation.io/guide/start/index.html">Module Federation — Introduction</a> и <a href="https://module-federation.io/configure/shared.html">Configure → shared</a>. Для Vite — <a href="https://github.com/module-federation/vite">README плагина</a> (в playground он лежит в <code>node_modules/@module-federation/vite/README.md</code>), особенно разделы про конфиг host и remote.</p>
+</div>
+
+<p>Шпаргалки: <a href="../reference/module-federation.html">Module Federation</a> · <a href="../reference/state-sync.html">Синхронизация состояния</a> · <a href="../reference/communication-channels.html">Каналы связи</a>. Код: <a href="../playground/README.md">playground/README.md</a>.</p>
+
+<div class="ask">Что-то не запускается или непонятно, например «а как это выглядит в webpack/Rspack», «как деплоить remoteEntry на CDN» или «как типизировать remote в TypeScript»? Спросите преподавателя (агента) в чате и вставьте ошибку из консоли целиком.</div>
+
+<nav class="course-nav">
+  <a href="0002-state-sync.html">← Урок 2 · Синхронизация состояния</a>
+  <a href="0004-routing.html">Урок 4 · Роутинг →</a>
+</nav>
+
+</main>
+<script src="../assets/quiz.js"></script>
+<script src="../assets/reveal.js"></script>
+</body>
+</html>

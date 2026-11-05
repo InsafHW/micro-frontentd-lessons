@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Каналы связи между МФ</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Каналы связи между микрофронтендами</h1>
+<p class="lede">Общайтесь как можно меньше. Если общаться нужно, выбирайте канал по тому, <em>что</em> передаётся.</p>
+
+<table>
+  <thead><tr><th>Канал</th><th>Направление</th><th>Что передаёт</th><th>Пример</th><th>Ловушки</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Атрибуты / props</strong></td><td>Shell → МФ ↓</td><td>Входные данные, которыми владеет контейнер</td><td><code>&lt;catalog-list user="Анна"&gt;</code><br>React/Vue: props при монтировании</td><td>Атрибуты — только строки; сложные объекты передавайте свойством или props. Ставить атрибуты чужому МФ может только Shell, но не сосед.</td></tr>
+    <tr><td><strong>События</strong></td><td>МФ → кому интересно ↑</td><td><em>Факт</em> в прошедшем времени: «добавили», «изменилось»</td><td><code>catalog:add-to-cart</code><br><code>cart:changed {count,total}</code></td><td>Нужны <code>bubbles</code> и <code>composed</code> из Shadow DOM. Слушатель, подключившийся позже, событие пропустил (см. урок 2). Контракт неявный, его нужно документировать.</td></tr>
+    <tr><td><strong>URL</strong></td><td>⇄ все</td><td><em>Намерение</em> пользователя и навигационное состояние</td><td><code>/catalog?genre=sf</code></td><td>Формат маршрута становится контрактом между командами, покрывайте его тестами.</td></tr>
+  </tbody>
+</table>
+
+<h2>Правила</h2>
+<ol>
+  <li><strong>Один владелец</strong> у каждого куска данных. Остальные получают копии и никогда не пишут в чужое.</li>
+  <li><strong>Нет общего store и общих глобальных переменных</strong>, даже при одном фреймворке у всех команд.</li>
+  <li><strong>Префикс команды</strong> во всём общем: события, CSS-классы, ключи localStorage, cookies (<code>cart:*</code>, <code>.cart-*</code>).</li>
+  <li><strong>Нативные API браузера</strong> (CustomEvent, атрибуты, URL) вместо самописной шины: так контракт не зависит от фреймворка.</li>
+  <li><strong>Устойчивость:</strong> отправитель события не ждёт ответа. Падение одного МФ не роняет остальные.</li>
+  <li><strong>Сквозное держит Shell:</strong> роутинг, авторизацию и решение, где и когда монтировать МФ.</li>
+</ol>
+
+<h2>Быстрый выбор</h2>
+<table>
+  <tbody>
+    <tr><td>«Контейнер знает X, МФ нужно X»</td><td>→ атрибут / prop</td></tr>
+    <tr><td>«В МФ что-то случилось, другим может быть интересно»</td><td>→ событие с префиксом</td></tr>
+    <tr><td>«Пользователь хочет попасть куда-то / это должно пережить F5»</td><td>→ URL</td></tr>
+    <tr><td>«Двум МФ постоянно нужны данные друг друга»</td><td>→ пересмотрите границу</td></tr>
+  </tbody>
+</table>
+
+<h2>Код</h2>
+<pre><code><span class="c">// отправить факт</span>
+el.dispatchEvent(new CustomEvent('cart:changed', { detail: { count: 3 }, bubbles: true, composed: true }))
+<span class="c">// подписаться (и отписаться при размонтировании!)</span>
+window.addEventListener('cart:changed', onChange)
+window.removeEventListener('cart:changed', onChange)</code></pre>
+
+<p class="aside">Источники: <a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a> · <a href="https://micro-frontends.org/">micro-frontends.org</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent">MDN: CustomEvent</a>. Урок: <a href="../lessons/0001-anatomy-and-channels.html">1 · Анатомия и каналы связи</a>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Синхронизация состояния МФ</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Синхронизация состояния между микрофронтендами</h1>
+<p class="lede">У данных один дом. Остальные получают копии и знают, как наверстать пропущенное.</p>
+
+<h2>Три уровня</h2>
+<table>
+  <thead><tr><th>Уровень</th><th>Кто</th><th>Правило</th></tr></thead>
+  <tbody>
+    <tr><td>Источник истины</td><td>Бэкенд домена (BFF команды-владельца)</td><td>Переживает F5, вкладки, устройства</td></tr>
+    <tr><td>Владелец на клиенте</td><td>МФ домена</td><td>Единственный писатель. Кэш живёт дольше компонента</td></tr>
+    <tr><td>Читатели</td><td>Все остальные МФ</td><td>Только копии через события. Не лезут в чужое хранилище</td></tr>
+  </tbody>
+</table>
+
+<h2>Проблема → приём</h2>
+<table>
+  <thead><tr><th>Проблема</th><th>Приём</th><th>Механизм</th></tr></thead>
+  <tbody>
+    <tr><td>Компонент выгрузили — данные пропали</td><td>Хранить состояние вне жизненного цикла компонента</td><td>Бэкенд; кэш с ключом <code>команда:домен:vN</code></td></tr>
+    <tr><td>Опоздавший подписчик</td><td>Снимок, а не дельта. Рукопожатие в обе стороны</td><td>Читатель: <code>x:state-request</code>. Владелец: <code>x:changed</code> при монтировании и на запрос</td></tr>
+    <tr><td>Действие потерялось, пока владельца нет</td><td>Подтверждение приёма</td><td><code>cancelable: true</code> + <code>preventDefault()</code>; <code>dispatchEvent()</code> → <code>false</code> = принято</td></tr>
+    <tr><td>Вкладки разъехались</td><td>Владелец синхронизирует сам себя</td><td><code>BroadcastChannel</code> (отправитель своё не получает) или событие <code>storage</code> (не в своей вкладке)</td></tr>
+  </tbody>
+</table>
+
+<h2>Атрибут или событие?</h2>
+<table>
+  <tbody>
+    <tr><td><strong>Атрибут / prop</strong> — это <em>состояние</em></td><td>Всегда текущее значение, опоздать невозможно. Подходит, когда владелец — родитель (Shell).</td></tr>
+    <tr><td><strong>Событие</strong> — это <em>момент</em></td><td>Можно пропустить. Нужны снимки и рукопожатие. Подходит для соседей.</td></tr>
+  </tbody>
+</table>
+
+<h2>Код-скелет</h2>
+<pre><code><span class="c">// Владелец</span>
+let state = await loadFromBackend()                      <span class="c">// или кэш владельца</span>
+const announce = () => dispatchEvent(new CustomEvent('cart:changed', { detail: snapshot(state) }))
+addEventListener('cart:state-request', announce)
+addEventListener('catalog:add-to-cart', (e) => { e.preventDefault(); update(e.detail) })
+const bc = new BroadcastChannel('polka-cart')
+bc.onmessage = (m) => { state = m.data; announce() }     <span class="c">// из другой вкладки</span>
+function update(x) { state = apply(state, x); save(state); bc.postMessage(state); announce() }
+announce()                                               <span class="c">// «я загрузился»</span>
+
+<span class="c">// Читатель</span>
+addEventListener('cart:changed', (e) => render(e.detail))
+dispatchEvent(new CustomEvent('cart:state-request'))</code></pre>
+
+<h2>Анти-паттерны</h2>
+<ul>
+  <li>Общий store в Shell для доменных данных: Shell начинает владеть чужим доменом.</li>
+  <li>Читатель читает чужой <code>localStorage</code> или ходит в чужой API в обход владельца.</li>
+  <li>Дельты в событиях (<code>+1</code>): один пропуск, и копии расходятся навсегда.</li>
+  <li>Каждый МФ слушает BroadcastChannel чужого домена.</li>
+  <li>BroadcastChannel на <code>file://</code>: в Chrome сообщения не доставляются.</li>
+</ul>
+
+<p class="aside">Источники: <a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">MDN: dispatchEvent</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel">MDN: BroadcastChannel</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/storage_event">MDN: storage event</a>. Урок: <a href="../lessons/0002-state-sync.html">2 · Синхронизация состояния</a>.</p>
+</main>
+</body>
+</html>

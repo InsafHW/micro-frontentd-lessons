@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Анатомия и каналы связи</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .demo-wrap { margin: 1.5rem 0 1rem; }
+  .demo-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin: .8rem 0 1.2rem; }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 2.1rem; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--sans); font-size: .72rem; font-weight: 600; display: grid; place-items: center; }
+  details { border: 1px solid var(--rule); border-radius: 10px; padding: .9rem 1.1rem; background: var(--surface); margin: 1rem 0; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  details[open] summary { margin-bottom: .8rem; }
+  .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .8rem; margin: 1.5rem 0; }
+  .three > div { border-top: 3px solid var(--rule); padding-top: .6rem; font-size: .9rem; }
+  .three h4 { font-family: var(--sans); font-size: .8rem; margin: 0 0 .3rem; }
+  .three p { margin: 0; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<main>
+
+<p class="kicker">Урок 1 · Микрофронтенды</p>
+<h1>Анатомия микрофронтендов и три канала связи</h1>
+<p class="lede">После урока вы сможете, глядя на любое действие в интерфейсе, сказать, <em>каким каналом</em> один микрофронтенд должен сообщить о нём другому, и объяснить это на собеседовании за минуту.</p>
+
+<h2>Что это вообще такое</h2>
+<p>Микрофронтенды — это «архитектурный стиль, при котором независимо поставляемые фронтенд-приложения собираются в единое целое»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. Ключевое слово здесь <strong>независимо поставляемые</strong>: каждая команда собирает, тестирует и деплоит свой кусок сама, не дожидаясь остальных. Всё остальное, включая разные фреймворки, — следствие, а не цель.</p>
+
+<p>Поэтому приложение режут <strong>по бизнес-доменам</strong> (каталог, корзина, аккаунт), а не по техническим слоям («компоненты», «API», «стили»). Одна команда владеет доменом целиком.</p>
+
+<p>Весь курс мы будем разбирать на одном примере: книжный маркетплейс <strong>«Полка»</strong>.</p>
+
+<figure>
+<svg viewBox="0 0 640 300" role="img" aria-label="Схема: Shell содержит три микрофронтенда; вниз идут атрибуты, вверх события, сверху адресная строка">
+  <style>
+    .t { font: 600 13px Inter, system-ui, sans-serif; fill: var(--ink); }
+    .s { font: 12px Inter, system-ui, sans-serif; fill: var(--ink-soft); }
+    .m { font: 11px "JetBrains Mono", monospace; fill: var(--ink-soft); }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-soft)"/></marker>
+  </defs>
+  <!-- URL -->
+  <rect x="20" y="8" width="600" height="30" rx="15" fill="var(--code-bg)" stroke="var(--rule)"/>
+  <text x="40" y="28" class="m">polka.ru/catalog?genre=sf</text>
+  <text x="608" y="28" class="s" text-anchor="end">URL ⇄ общий для всех</text>
+  <!-- Shell -->
+  <rect x="20" y="52" width="600" height="236" rx="12" fill="none" stroke="var(--shell)" stroke-width="2"/>
+  <text x="38" y="78" class="t">Shell (контейнер)</text>
+  <text x="38" y="96" class="s">роутинг · авторизация · где и когда монтировать МФ</text>
+  <!-- MFs -->
+  <rect x="38" y="160" width="176" height="110" rx="10" fill="none" stroke="var(--catalog)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="54" y="186" class="t">Каталог</text><text x="54" y="204" class="s">React · своя команда</text>
+  <rect x="232" y="160" width="176" height="110" rx="10" fill="none" stroke="var(--cart)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="248" y="186" class="t">Корзина</text><text x="248" y="204" class="s">Vue · своя команда</text>
+  <rect x="426" y="160" width="176" height="110" rx="10" fill="none" stroke="var(--account)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="442" y="186" class="t">Аккаунт</text><text x="442" y="204" class="s">Angular · своя команда</text>
+  <!-- down arrows -->
+  <line x1="100" y1="108" x2="100" y2="156" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="514" y1="108" x2="514" y2="156" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text x="108" y="138" class="s">↓ атрибуты / props</text>
+  <!-- event arrow catalog -> cart -->
+  <path d="M176,253 L228,253" stroke="var(--accent)" stroke-width="1.8" fill="none" marker-end="url(#ah)"/>
+  <text x="54" y="234" class="m">catalog:add-to-cart</text>
+  <text x="54" y="258" class="s">↑ событие о факте</text>
+</svg>
+<figcaption>Shell владеет «рамкой»: адресом, входом пользователя и тем, какой МФ где смонтирован. Каждый МФ — чёрный ящик своей команды.</figcaption>
+</figure>
+
+<h2>Три канала связи</h2>
+<p>Главный совет канонической статьи — «чтобы микрофронтенды общались как можно меньше»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. Когда общаться всё же нужно, хватает трёх каналов:</p>
+
+<div class="three">
+  <div style="border-color: var(--shell)"><h4>↓ Атрибуты / props</h4><p>Контейнер передаёт данные <em>вниз</em>: «вот текущий пользователь». Явный входной контракт.</p></div>
+  <div style="border-color: var(--accent)"><h4>↑ События</h4><p>МФ сообщает о <em>факте</em>: «добавили книгу». Он не знает и не должен знать, кто слушает.</p></div>
+  <div style="border-color: var(--account)"><h4>⇄ URL</h4><p>Намерение пользователя: «открыть каталог фантастики». Переживает перезагрузку, им можно поделиться.</p></div>
+</div>
+
+<pre><code><span class="c">// ↓ Shell → МФ. В React/Vue это были бы props смонтированного компонента.</span>
+catalog.setAttribute('user', 'Анна')
+
+<span class="c">// ↑ МФ сообщает факт. Префикс команды в имени, bubbles+composed — чтобы выйти из Shadow DOM.</span>
+this.dispatchEvent(new CustomEvent('catalog:add-to-cart', {
+  detail: { sku: 'dune', price: 790 }, bubbles: true, composed: true,
+}))
+<span class="c">// …а Корзина (другая команда, другой бандл) просто слушает:</span>
+window.addEventListener('catalog:add-to-cart', (e) => addItem(e.detail))
+
+<span class="c">// ⇄ URL: обычная ссылка. Shell-роутер превратит её в атрибут genre="sf".</span>
+&lt;a href="/catalog?genre=sf"&gt;Ещё фантастики&lt;/a&gt;</code></pre>
+
+<p class="aside">Почему нативные события, а не своя шина? Принцип micro-frontends.org: «используйте события браузера для коммуникации вместо собственной глобальной PubSub-системы»<a class="cite" href="https://micro-frontends.org/">[2]</a>. API события есть в любом фреймворке, поэтому стек каждой команды остаётся её личным делом.</p>
+
+<div class="callout">
+  <span class="label">Правило состояния</span>
+  <p>У каждого куска данных ровно <strong>один владелец</strong>. Корзиной владеет Корзина, входом пользователя — Shell. Остальные получают копии через каналы выше, но никогда не пишут в чужое. Отсюда совет «избегать любого общего состояния»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a> и «не делить рантайм, даже если у всех команд один фреймворк»<a class="cite" href="https://micro-frontends.org/">[2]</a>.</p>
+</div>
+
+<h2>Потрогайте руками</h2>
+<p>Ниже — живая «Полка»: четыре независимых компонента, каждый со своим Shadow DOM и своим состоянием. Журнал под ней ничего не знает о коде приложения. Он подслушивает настоящие каналы: события на <code>window</code>, изменения атрибутов и адресной строки.</p>
+
+<div class="demo-wrap">
+  <polka-app id="demo"></polka-app>
+</div>
+<div class="demo-controls no-print">
+  <button type="button" id="kill">Уронить МФ корзины</button>
+  <button type="button" id="revive" disabled>Вернуть МФ корзины</button>
+</div>
+<mf-event-log listen="catalog:add-to-cart cart:changed" watch="#demo" attrs="user genre" url></mf-event-log>
+
+<h3>Эксперимент: четыре шага, следите за журналом</h3>
+<ol class="steps">
+  <li>Нажмите <b>«Войти как Анна»</b>. В журнале появится <code>атрибут ↓</code> от Shell к Каталогу: авторизацией владеет Shell и раздаёт её вниз.</li>
+  <li>Добавьте в корзину две книги. На каждый клик будет <em>два</em> события: Каталог сообщил факт (<code>catalog:add-to-cart</code>), Корзина обновила своё состояние и сообщила своё (<code>cart:changed</code>). Каталог при этом ничего не знает о Корзине.</li>
+  <li>Откройте <b>Аккаунт</b> и нажмите «Ещё фантастики». Цепочка: <code>URL ⇄</code> → Shell смонтировал Каталог → жанр пришёл атрибутом. Аккаунт не знает, кто отрисует каталог, он просто сменил адрес.</li>
+  <li>Нажмите <b>«Уронить МФ корзины»</b> и добавьте книгу. Каталог продолжает работать, событие просто никто не обрабатывает. Теперь <b>верните корзину</b> и посмотрите на счётчик.</li>
+</ol>
+
+<div class="callout">
+  <span class="label">Задача на подумать до следующего урока</span>
+  <p>После шага 4 счётчик показывает 0, хотя вы добавляли книги. Почему так вышло, кто виноват и как бы вы это починили? Запишите ответ в одну-две строки: на нём начнётся урок 2 про синхронизацию состояния.</p>
+</div>
+
+<h2>Проверьте себя</h2>
+<p>Отвечайте по памяти, не прокручивая вверх. Усилие при вспоминании и есть то, что закрепляет знание.</p>
+
+<div class="quiz" data-quiz>
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Пользователь нажал «В корзину» в Каталоге. Как правильно обновить счётчик в шапке?</p>
+    <button data-key="a">Каталог вызывает метод компонента Корзины</button>
+    <button data-key="b">Каталог пишет в общий глобальный store</button>
+    <button data-key="c">Каталог отправляет событие о факте</button>
+    <button data-key="d">Shell перерисовывает всю страницу целиком</button>
+    <p class="quiz-explain">Каталог сообщает факт <code>catalog:add-to-cart</code>, а Корзина, владелец данных, сама решает, что с ним делать. Прямой вызов связывает команды контрактом на внутренний API, общий store нарушает правило одного владельца.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt">Кто должен владеть информацией о том, вошёл ли пользователь?</p>
+    <button data-key="a">Shell, и раздаёт её вниз атрибутами</button>
+    <button data-key="b">Каждый МФ хранит собственную копию входа</button>
+    <button data-key="c">Каталог, ведь он показывает личную подборку</button>
+    <button data-key="d">Корзина, ведь именно она оформляет заказ</button>
+    <p class="quiz-explain">Авторизация сквозная, поэтому её обычно держит контейнер и передаёт токен или пользователя каждому МФ<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. Свои копии у каждого МФ быстро разъедутся: один решит, что вы вошли, другой — что нет.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt">Аккаунт хочет открыть Каталог сразу с фильтром «фантастика». Какой канал лучше?</p>
+    <button data-key="a">Событие account:open-catalog с жанром внутри</button>
+    <button data-key="b">Атрибут genre прямо на элементе Каталога</button>
+    <button data-key="c">Глобальная переменная window.genre на странице</button>
+    <button data-key="d">Ссылка, где жанр передаётся через URL</button>
+    <p class="quiz-explain">Это намерение пользователя, а не факт для подписчиков. URL переживает перезагрузку, им можно поделиться, и Аккаунту не нужно знать, смонтирован ли Каталог. Ставить атрибуты чужим МФ — работа Shell, а не соседа.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt">МФ Корзины не загрузился. Что происходит с Каталогом в хорошо спроектированной системе?</p>
+    <button data-key="a">Каталог падает вслед за упавшей Корзиной</button>
+    <button data-key="b">Каталог работает, событие уходит в пустоту</button>
+    <button data-key="c">Shell перезагружает страницу до полного восстановления</button>
+    <button data-key="d">Каталог ждёт, пока Корзина ему ответит</button>
+    <p class="quiz-explain">Событие — это «выстрелил и забыл»: отправитель не зависит от наличия слушателей. Поэтому сбой одной команды не роняет остальных. Это аргумент в пользу событий перед прямыми вызовами.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Зачем называть события с префиксом команды, например <code>cart:changed</code>?</p>
+    <button data-key="a">Так браузер быстрее обрабатывает такие события</button>
+    <button data-key="b">Этого требует спецификация CustomEvent в браузерах</button>
+    <button data-key="c">Сразу виден владелец, и имена не конфликтуют</button>
+    <button data-key="d">Так браузер изолирует события разных команд</button>
+    <p class="quiz-explain">Принцип «префиксов команд»: неймспейсить CSS, события, localStorage и cookies, чтобы избежать коллизий и сделать владение очевидным<a class="cite" href="https://micro-frontends.org/">[2]</a>. Браузеру префикс безразличен, это соглашение между людьми.</p>
+  </div>
+  <p class="quiz-score" aria-live="polite"></p>
+</div>
+
+<h2>Тренировка для собеседования</h2>
+<p>Засеките 60 секунд и ответьте <strong>вслух</strong>, прежде чем раскрыть образец:</p>
+<p><em>«Как у вас микрофронтенды общаются между собой и где живёт состояние?»</em></p>
+<details>
+  <summary>Образец ответа</summary>
+  <p>Стараемся, чтобы они общались как можно меньше: если два МФ постоянно переговариваются, граница между ними, скорее всего, проведена неудачно. Каналов три. Вниз контейнер передаёт данные через props или атрибуты, например текущего пользователя. Вверх МФ отправляют браузерные события о фактах с префиксом команды, например <code>catalog:add-to-cart</code>, и не знают, кто их слушает. Намерения пользователя передаются через URL. Общего store нет: у каждого куска данных один владелец, корзиной владеет МФ корзины, остальные только получают события. Поэтому падение одного МФ не роняет остальные.</p>
+</details>
+
+<div class="source">
+  <span class="label">Главный источник к уроку</span>
+  <p style="margin:0"><a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends» (martinfowler.com)</a>. Прочитайте разделы <em>Integration approaches</em> и <em>Cross-application communication</em>, это около 15 минут. Затем пять принципов на <a href="https://micro-frontends.org/">micro-frontends.org</a>.</p>
+</div>
+
+<p>Шпаргалка по уроку: <a href="../reference/communication-channels.html">Каналы связи между МФ</a>.</p>
+
+<div class="ask">Что-то непонятно или хочется копнуть глубже, например «а как это выглядит с Module Federation» или «а если двум МФ нужны одни и те же данные»? Спросите своего преподавателя (агента) прямо в чате. И принесите ответ на задачу про обнулившийся счётчик.</div>
+
+<nav class="course-nav">
+  <span></span>
+  <a href="0002-state-sync.html">Урок 2 · Синхронизация состояния →</a>
+</nav>
+
+</main>
+<script src="../assets/event-log.js"></script>
+<script src="../assets/polka-demo.js"></script>
+<script src="../assets/quiz.js"></script>
+<script>
+  const app = document.getElementById("demo");
+  const kill = document.getElementById("kill"), revive = document.getElementById("revive");
+  kill.onclick = () => { app.setCartEnabled(false); kill.disabled = true; revive.disabled = false; };
+  revive.onclick = () => { app.setCartEnabled(true); kill.disabled = false; revive.disabled = true; };
+</script>
+</body>
+</html>

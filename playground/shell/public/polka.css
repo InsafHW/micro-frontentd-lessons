@@ -1,0 +1,21 @@
+/* Общий «дизайн-токен» лист Shell. Классы с префиксом mf- — соглашение для рамок МФ в учебном стенде. */
+:root { --ink:#1d1c1a; --soft:#6b665e; --rule:#e4e0d8; --bg:#fbfaf7; --shell:#4a5a6a; --catalog:#2f7d6d; --cart:#8a5a9e; --bad:#c62828; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 Inter, system-ui, sans-serif; }
+.shell { max-width:760px; margin:32px auto; padding:28px 18px 18px; border:2px solid var(--shell); border-radius:14px; position:relative; }
+.shell > .mf-label { background:var(--shell); }
+header { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.brand { font:600 20px Georgia, serif; } nav { display:flex; gap:12px; } nav a { color:var(--ink); } .spacer { flex:1; }
+.mf { position:relative; border:2px dashed var(--rule); border-radius:10px; padding:20px 14px 12px; }
+.mf-label { position:absolute; top:-10px; left:10px; font-size:11px; font-weight:600; color:#fff; padding:1px 8px; border-radius:99px; background:#888; white-space:nowrap; }
+.mf-catalog { border-color:var(--catalog); } .mf-catalog > .mf-label { background:var(--catalog); }
+.mf-cart { border-color:var(--cart); padding:14px 12px 8px; } .mf-cart > .mf-label { background:var(--cart); }
+.mf ul { list-style:none; padding:0; margin:8px 0 0; } .mf li { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--rule); }
+button { font:inherit; font-size:13px; border:1px solid var(--rule); background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; }
+.muted { color:var(--soft); margin:0; } .warn { color:var(--bad); }
+.fallback { border:2px dashed var(--bad); border-radius:10px; padding:12px 14px; color:var(--bad); }
+nav a { text-decoration:none; border-bottom:2px solid transparent; } nav a.on { border-color:var(--shell); }
+.mf h2 { font:600 18px Georgia, serif; margin:4px 0 8px; } .mf a { color:inherit; }
+.mf-cart.page { border-color:var(--cart); padding:20px 14px 12px; }
+button.danger { border-color:var(--bad); color:var(--bad); }
+.probe { font-size:12px; color:var(--soft); margin:16px 0 0; padding-top:10px; border-top:1px dashed var(--rule); }
+.probe-bad { color:var(--bad); font-weight:600; }

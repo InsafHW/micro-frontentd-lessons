@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Роутинг между МФ</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps > li { counter-increment: s; position: relative; padding-left: 2.1rem; margin-bottom: 1.3rem; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--sans); font-size: .72rem; font-weight: 600; display: grid; place-items: center; }
+  .predict { font-family: var(--sans); font-size: .78rem; color: var(--accent); font-weight: 600; }
+  details { border: 1px solid var(--rule); border-radius: 10px; padding: .9rem 1.1rem; background: var(--surface); margin: 1rem 0; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  details[open] summary { margin-bottom: .8rem; }
+  .rules { counter-reset: r; list-style: none; padding: 0; }
+  .rules li { counter-increment: r; border-left: 3px solid var(--shell); padding: .1rem 0 .1rem .9rem; margin-bottom: .9rem; }
+  .rules li::before { content: "Правило " counter(r); display: block; font-family: var(--sans); font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<main>
+
+<p class="kicker">Урок 4 · Микрофронтенды</p>
+<h1>Роутинг: один адрес, много микрофронтендов</h1>
+<p class="lede">Адресная строка у вкладки одна, а роутеров хочется по одному на каждый МФ. После урока вы сможете объяснить, кто владеет URL, как МФ получает «свою» часть адреса и почему переход в обход контракта тихо ломает страницу.</p>
+
+<h2>Разминка: урок 3</h2>
+<p>Почему Shell может рендерить <code>&lt;Catalog /&gt;</code> только при <code>shared: { react: { singleton: true } }</code>, а для Корзины через <code>mount(el)</code> это не нужно? Ответьте, потом откройте.</p>
+<p class="reveal">Компонент Каталога рендерит <code>react-dom</code> Shell, и хуки должны обращаться к той же копии React, иначе <code>useState</code> of null. При <code>mount(el)</code> remote рендерит сам, своей собственной парой React + ReactDOM (или Vue), так что всё согласовано. Цена — две копии фреймворка на странице. Вы как раз проверяли это своим <code>catalog/src/mount.jsx</code>.</p>
+
+<h2>Два уровня одного адреса</h2>
+<figure>
+<svg viewBox="0 0 640 150" role="img" aria-label="Адрес /catalog/book/dune: префикс /catalog обрабатывает Shell, хвост /book/dune обрабатывает Каталог">
+  <style>
+    .t { font: 600 13px Inter, system-ui, sans-serif; fill: var(--ink); }
+    .s { font: 11.5px Inter, system-ui, sans-serif; fill: var(--ink-soft); }
+    .u { font: 600 20px "JetBrains Mono", monospace; }
+  </style>
+  <rect x="20" y="14" width="600" height="46" rx="23" fill="var(--code-bg)" stroke="var(--rule)"/>
+  <text x="60" y="44" class="u" fill="var(--ink-soft)">polka.ru</text>
+  <text x="178" y="44" class="u" fill="var(--shell)">/catalog</text>
+  <text x="290" y="44" class="u" fill="var(--catalog)">/book/dune</text>
+  <line x1="230" y1="66" x2="230" y2="88" stroke="var(--shell)" stroke-width="2"/>
+  <line x1="355" y1="66" x2="355" y2="88" stroke="var(--catalog)" stroke-width="2"/>
+  <rect x="96" y="90" width="252" height="50" rx="8" fill="none" stroke="var(--shell)" stroke-width="2"/>
+  <text x="110" y="111" class="t">Shell: префикс → какой МФ</text>
+  <text x="110" y="129" class="s">таблица маршрутов верхнего уровня</text>
+  <rect x="356" y="90" width="230" height="50" rx="8" fill="none" stroke="var(--catalog)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="370" y="111" class="t">Каталог: что значит хвост</text>
+  <text x="370" y="129" class="s">свои подмаршруты, своя логика</text>
+</svg>
+</figure>
+<p>Так устроен пример в канонической статье. Контейнер сопоставляет URL со списком маршрутов и решает, какой МФ монтировать. А «собственная логика роутинга» МФ потом извлекает из URL ID ресторана и показывает нужное<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. В «Полке» таблица Shell — это два префикса (<a href="../playground/shell/src/router.js">shell/src/router.js</a>), а <code>/book/:sku</code> знает только Каталог.</p>
+
+<h2>Три правила</h2>
+<ol class="rules">
+  <li><p><strong>История одна, и меняется через один контракт.</strong> В статье контейнер передаёт всем МФ один и тот же объект <code>history</code>, и тогда «изменения маршрута, вызванные в любом из роутеров, отражаются во всех»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. У нас то же самое, но без зависимости от библиотеки: Shell передаёт вниз <code>path</code> и функцию <code>navigate(to)</code>. React-компоненту — через props, Vue-Корзине — аргументом <code>mount(el, { navigate })</code>.</p></li>
+  <li><p><strong>Переход в обход контракта Shell не увидит.</strong> «Просто вызвать <code>history.pushState()</code> или <code>history.replaceState()</code> — <code>popstate</code> не сработает»: он срабатывает только на действия браузера вроде кнопки «Назад»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event">[2]</a>. Если Каталог сам сделает <code>pushState('/cart')</code>, адрес сменится, а страница нет.</p></li>
+  <li><p><strong>Адрес — публичный контракт между командами.</strong> Корзина ведёт на <code>/catalog/book/:sku</code>, то есть знает формат адреса чужого МФ. Статья прямо говорит: выбранные маршруты «составляют контракт», их нельзя поменять, не обновив все приложения, которые на них ссылаются, и это нужно проверять автоматическими тестами<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>.</p></li>
+</ol>
+
+<div class="callout">
+  <span class="label">Не забудьте про сервер</span>
+  <p>Пользователь может обновить страницу на <code>/catalog/book/dune</code> или открыть её по ссылке из письма. Сервер должен отдать на этот путь <code>index.html</code> Shell, а дальше разберётся роутер. <code>vite preview</code> делает это сам (я проверил: 200 и страница Shell). В проде это отдельная настройка сервера или CDN.</p>
+</div>
+
+<h2>Лабораторная</h2>
+<p>Я обновил playground: в Shell появился роутер, у Каталога — страница книги, у Корзины — своя страница <code>/cart</code> на Vue. Внизу Shell есть диагностическая полоска: «адрес / что смонтировано». Если ваши серверы ещё работают, просто обновите страницу. Если нет: <code>cd playground &amp;&amp; npm start</code>.</p>
+
+<ol class="steps">
+  <li><b>Глубокая ссылка.</b> Откройте <a href="http://localhost:5170/catalog/book/dune">localhost:5170/catalog/book/dune</a> напрямую. <span class="predict">Кто из двоих понял, что нужно показать «Дюну»?</span> <span class="reveal">Оба, но по-разному. Shell по префиксу <code>/catalog</code> выбрал МФ, а Каталог по хвосту <code>/book/dune</code> выбрал книгу. Shell про книги ничего не знает.</span></li>
+  <li><b>Туда и обратно.</b> «Перейти в корзину» → в Корзине кликните по книге → дважды «Назад» в браузере. <span class="predict">Куда приведёт каждое «Назад»?</span> <span class="reveal">Сначала на <code>/cart</code>, потом снова на книгу. Переходы шли через <code>navigate()</code>, поэтому в истории три записи, а на «Назад» Shell узнаёт о смене через <code>popstate</code>. React и Vue живут на одной истории.</span></li>
+  <li><b>Поломка.</b> На странице книги нажмите красную кнопку «⚠ В корзину через history.pushState». <span class="predict">Что покажут адрес, страница и полоска?</span> <span class="reveal">Адрес станет <code>/cart</code>, а на странице останется книга. Полоска покраснеет: «рассинхрон: по адресу должен быть cart-page». Обновите страницу (F5), и всё станет правильно. Поэтому такой баг легко пропустить в разработке.</span></li>
+  <li><b>404.</b> Откройте <a href="http://localhost:5170/nope">localhost:5170/nope</a>. <span class="predict">Чья это страница ошибки?</span> <span class="reveal">Shell: путь не совпал ни с одним префиксом таблицы. «Не найдено» на уровне префиксов — ответственность Shell. А «книга не найдена» по <code>/catalog/book/xxx</code> — уже Каталога, попробуйте.</span></li>
+</ol>
+
+<h3>Задача на код: страховочная сетка</h3>
+<p>Сделайте так, чтобы Shell замечал <em>любую</em> смену адреса, даже в обход <code>navigate()</code>, и шаг 3 перестал ломаться. Подсказка: Navigation API, «преемник History API, нацеленный на нужды SPA»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">[3]</a>. Нужно событие, которое срабатывает <em>после</em> смены текущей записи истории. Правьте <code>shell/src/router.js</code>, затем выполните <code>npm run build -w shell</code> и повторите шаг 3.</p>
+<details>
+  <summary>Решение (проверено на нашем стенде)</summary>
+<pre><code>useEffect(() =&gt; {
+  if (!('navigation' in window)) return          <span class="c">// старые браузеры: сетки нет, живём на контракте</span>
+  const sync = () =&gt; setPath(location.pathname)
+  navigation.addEventListener('currententrychange', sync)
+  return () =&gt; navigation.removeEventListener('currententrychange', sync)
+}, [])</code></pre>
+  <p>В Chrome я проверил: <code>currententrychange</code> срабатывает на <code>pushState</code> (тип <code>push</code>), <code>replaceState</code> (<code>replace</code>) и «Назад» (<code>traverse</code>), и <code>location</code> к этому моменту уже обновлён. С этим кодом полоска на шаге 3 остаётся зелёной.</p>
+  <p>Почему это сетка, а не замена контракту: у Navigation API статус «Baseline 2026, newly available», то есть «может не работать в старых устройствах и браузерах»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">[3]</a>. Контракт <code>navigate()</code> работает везде и делает намерение явным.</p>
+</details>
+
+<h2>Проверьте себя</h2>
+<p>Последние два вопроса — из уроков 3 и 2.</p>
+
+<div class="quiz" data-quiz>
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt">Кто решает, что означает <code>/book/dune</code> в адресе <code>/catalog/book/dune</code>?</p>
+    <button data-key="a">Shell, ведь он владеет адресной строкой</button>
+    <button data-key="b">Каталог, ведь это его собственный подмаршрут</button>
+    <button data-key="c">Сервер, который отдаёт index.html на путь</button>
+    <button data-key="d">Корзина, ведь она ссылается на книгу</button>
+    <p class="quiz-explain">Shell хранит адрес и по префиксу выбирает МФ, но хвост не интерпретирует. Иначе каждая новая страница Каталога требовала бы релиза Shell, и независимая поставка пропала бы.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt">Каталог вызвал <code>history.pushState(null, '', '/cart')</code> напрямую. Почему Shell не смонтировал Корзину?</p>
+    <button data-key="a">Shell запрещает другим МФ менять адрес</button>
+    <button data-key="b">Адрес /cart отсутствует в таблице маршрутов</button>
+    <button data-key="c">Браузер блокирует pushState из чужого бандла</button>
+    <button data-key="d">pushState не вызывает popstate, Shell не узнал</button>
+    <p class="quiz-explain"><code>popstate</code> срабатывает только на действия браузера: «Назад», «Вперёд», <code>history.back()</code><a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event">[2]</a>. Ничего не запрещено и ничего не заблокировано, просто никто не сказал Shell о переходе.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt">Корзина ссылается на <code>/catalog/book/:sku</code>. Команда Каталога хочет перейти на <code>/catalog/books/:sku</code>. Что здесь главное?</p>
+    <button data-key="a">Это контракт: покрыть тестами и согласовать</button>
+    <button data-key="b">Ничего: Shell сам перепишет все ссылки</button>
+    <button data-key="c">Ничего: Корзина узнает новый адрес событием</button>
+    <button data-key="d">Сменить префикс /catalog в таблице Shell</button>
+    <p class="quiz-explain">Формат адреса — публичный API команды, как <code>exposes</code>. Обычно его меняют через переходный период: старый адрес поддерживают и редиректят, пока все потребители не обновятся. Тесты на контракт ловят забытых потребителей<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Пользователь обновил страницу на <code>/catalog/book/dune</code> и получил 404 от сервера, а не от приложения. В чём причина?</p>
+    <button data-key="a">Каталог не выставил свой подмаршрут в exposes</button>
+    <button data-key="b">Shell не знает про префикс /catalog вообще</button>
+    <button data-key="c">Сервер не отдаёт index.html на такой путь</button>
+    <button data-key="d">Браузер не умеет открывать вложенные адреса напрямую</button>
+    <p class="quiz-explain">404 от <em>сервера</em> значит, что до JavaScript дело не дошло. Если бы Shell не знал префикс, была бы его собственная страница «не найдено», как на шаге 4. <code>exposes</code> описывает модули, а не адреса.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt"><span class="team shell">урок 3</span> Каталог отдаётся через <code>mount(el)</code> и сам вызывает <code>createRoot</code> своим <code>react-dom</code>. Нужен ли <code>shared</code> singleton?</p>
+    <button data-key="a">Да, иначе хуки Каталога обязательно упадут</button>
+    <button data-key="b">Да, без него remote не соберётся</button>
+    <button data-key="c">Нет, только если Shell не React</button>
+    <button data-key="d">Нет, просто React будет загружен дважды</button>
+    <p class="quiz-explain">Каталог рендерит своей парой React + ReactDOM, поэтому хуки согласованы. Это ваш эксперимент с <code>mount.jsx</code>. Singleton здесь — экономия трафика, а не условие работы. Фреймворк Shell роли не играет.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt"><span class="team shell">урок 2</span> На <code>/cart</code> бейдж в шапке и страница корзины — оба из МФ Корзины. Как им лучше делить состояние?</p>
+    <button data-key="a">Через BroadcastChannel, как разные вкладки браузера</button>
+    <button data-key="b">Общий модуль состояния внутри одного МФ</button>
+    <button data-key="c">Через cart:changed, как чужие микрофронтенды</button>
+    <button data-key="d">Через localStorage, читая его по таймеру</button>
+    <p class="quiz-explain">Правило «нет общего состояния» действует <em>между командами</em>. Внутри одного МФ один владелец, и общий модуль — норма: в playground это <a href="../playground/cart/src/store.js">cart/src/store.js</a>. Оба exposes одного remote используют один экземпляр этого модуля.</p>
+  </div>
+  <p class="quiz-score" aria-live="polite"></p>
+</div>
+
+<h2>Тренировка для собеседования</h2>
+<p>60 секунд, вслух:</p>
+<p><em>«Как у вас устроен роутинг между микрофронтендами? Кто владеет URL? Что будет, если микрофронтенд сам поменяет адрес?»</em></p>
+<details>
+  <summary>Образец ответа</summary>
+  <p>Адрес один, поэтому роутинг двухуровневый. Shell держит таблицу префиксов (<code>/catalog</code> → Каталог, <code>/cart</code> → Корзина), монтирует нужный МФ и показывает 404 на уровне префиксов. Хвост адреса интерпретирует сам МФ: это его подмаршруты, Shell про них не знает, поэтому новые страницы не требуют релиза Shell. История одна: Shell передаёт микрофронтендам текущий путь и функцию <code>navigate</code> (или общий объект history, как в статье Cam Jackson), и все переходы, в том числе внутри МФ, идут через неё. Если МФ сам вызовет <code>pushState</code>, Shell не узнает: <code>popstate</code> на это не срабатывает, адрес и экран разъедутся. Поэтому контракт обязателен, а как страховку можно слушать <code>currententrychange</code> из Navigation API. Формат адресов — контракт между командами, его покрывают тестами. И сервер должен отдавать Shell на любой путь, чтобы работали глубокие ссылки.</p>
+</details>
+
+<div class="source">
+  <span class="label">Главный источник к уроку</span>
+  <p style="margin:0"><a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a>, раздел <em>The example in detail → Cross-application communication via routing</em>: там контейнер раздаёт микрофронтендам общий history. Затем <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">MDN: Navigation API</a>.</p>
+</div>
+
+<p>Шпаргалки: <a href="../reference/routing.html">Роутинг</a> · <a href="../reference/module-federation.html">Module Federation</a> · <a href="../reference/state-sync.html">Синхронизация состояния</a> · <a href="../reference/communication-channels.html">Каналы связи</a>.</p>
+
+<div class="ask">Интересно, как то же самое выглядит с React Router или Vue Router внутри МФ, или как роутинг устроен в single-spa? Спросите преподавателя (агента) в чате. Если ваш вариант решения задачи отличается от образца, покажите его, разберём.</div>
+
+<nav class="course-nav">
+  <a href="0003-module-federation.html">← Урок 3 · Module Federation</a>
+  <span>Дальше: Урок 5 · Изоляция стилей и ошибок (скоро)</span>
+</nav>
+
+</main>
+<script src="../assets/quiz.js"></script>
+<script src="../assets/reveal.js"></script>
+</body>
+</html>

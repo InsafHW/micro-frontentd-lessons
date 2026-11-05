@@ -1,0 +1,12 @@
+{
+  "name": "polka-playground",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shell", "catalog", "cart"],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "start": "npm run build && node scripts/preview-all.mjs",
+    "preview": "node scripts/preview-all.mjs",
+    "preview:no-catalog": "node scripts/preview-all.mjs shell cart"
+  }
+}

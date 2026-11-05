@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Синхронизация состояния</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .demo-controls { display: flex; gap: .5rem; flex-wrap: wrap; margin: .8rem 0 1.2rem; align-items: center; }
+  .demo-controls .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 .2rem; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 2.1rem; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--sans); font-size: .72rem; font-weight: 600; display: grid; place-items: center; }
+  .predict { font-family: var(--sans); font-size: .78rem; color: var(--accent); font-weight: 600; }
+  details { border: 1px solid var(--rule); border-radius: 10px; padding: .9rem 1.1rem; background: var(--surface); margin: 1rem 0; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  details[open] summary { margin-bottom: .8rem; }
+  .problem { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0 .8rem; margin: 2.2rem 0 0; }
+  .problem .n { font-family: var(--sans); font-weight: 600; font-size: 1.6rem; color: var(--accent); line-height: 1.2; }
+  .problem h3 { margin: 0 0 .4rem; }
+  .problem > div > :last-child { margin-bottom: 0; }
+  #file-warning { display: none; }
+</style>
+</head>
+<body>
+<main>
+
+<p class="kicker">Урок 2 · Микрофронтенды</p>
+<h1>Синхронизация состояния: владелец, снимок и опоздавшие</h1>
+<p class="lede">После урока вы сможете спроектировать, как данные одного микрофронтенда остаются согласованными в других. Даже когда МФ монтируются в разное время, падают и открыты в нескольких вкладках.</p>
+
+<h2>Сначала — домашняя задача</h2>
+<p>В <a href="0001-anatomy-and-channels.html">уроке 1</a> вы «уронили» Корзину, добавили книгу, вернули Корзину, и счётчик показал 0. <strong>Прежде чем раскрыть разбор, сформулируйте причину сами</strong>, хотя бы в одну строку. Попытка вспомнить, даже неудачная, заметно улучшает запоминание того, что вы прочитаете следом.</p>
+
+<details>
+  <summary>Разбор: почему счётчик обнулился</summary>
+  <p>Причин две, и они независимы:</p>
+  <ol>
+    <li><strong>Состояние жило внутри экземпляра компонента.</strong> <code>this.items = []</code> существует, пока существует элемент. Shell выгрузил <code>cart-badge</code>, и данные умерли вместе с ним. Новый экземпляр начал с пустого массива.</li>
+    <li><strong>У событий нет памяти.</strong> Пока Корзины не было, <code>catalog:add-to-cart</code> ушло в пустоту. Браузер не копит события для тех, кто подпишется потом. Книга, добавленная в этот момент, потеряна, причём молча: пользователь нажал кнопку и ничего не узнал.</li>
+  </ol>
+  <p>Первая мысль обычно такая: «давайте положим корзину в общий store в Shell». Это ошибка. Shell тогда становится владельцем чужого домена, каждое изменение формата корзины требует релиза Shell, и мы возвращаемся к связанности, от которой уходили. Каноническая рекомендация прямо говорит: «избегать любого общего состояния»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>.</p>
+</details>
+
+<h2>Модель: у данных есть дом</h2>
+<p>Правило из урока 1 («один владелец») теперь раскладывается на три уровня:</p>
+
+<figure>
+<svg viewBox="0 0 640 290" role="img" aria-label="Бэкенд корзины связан API с МФ корзины; МФ корзины рассылает снимки читателям и синхронизируется с собой в другой вкладке через BroadcastChannel">
+  <style>
+    .t { font: 600 13px Inter, system-ui, sans-serif; fill: var(--ink); }
+    .s { font: 11.5px Inter, system-ui, sans-serif; fill: var(--ink-soft); }
+    .m { font: 11px "JetBrains Mono", monospace; fill: var(--ink-soft); }
+  </style>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-soft)"/></marker>
+  </defs>
+  <rect x="20" y="90" width="150" height="80" rx="10" fill="var(--code-bg)" stroke="var(--rule)"/>
+  <text x="34" y="122" class="t">Бэкенд Корзины</text>
+  <text x="34" y="142" class="s">источник истины</text>
+  <text x="34" y="158" class="s">(BFF команды)</text>
+
+  <rect x="245" y="90" width="150" height="80" rx="10" fill="none" stroke="var(--cart)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="259" y="122" class="t">МФ Корзины</text>
+  <text x="259" y="142" class="s">владелец на клиенте</text>
+  <text x="259" y="158" class="s">один писатель</text>
+
+  <rect x="470" y="30" width="150" height="66" rx="10" fill="none" stroke="var(--recs)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="484" y="58" class="t">Рекомендации</text>
+  <text x="484" y="78" class="s">читатель снимков</text>
+
+  <rect x="470" y="164" width="150" height="66" rx="10" fill="none" stroke="var(--catalog)" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="484" y="192" class="t">Каталог</text>
+  <text x="484" y="212" class="s">сообщает факты</text>
+
+  <rect x="245" y="222" width="150" height="56" rx="10" fill="none" stroke="var(--cart)" stroke-width="1.5" stroke-dasharray="3 4"/>
+  <text x="259" y="246" class="t">Корзина</text>
+  <text x="259" y="264" class="s">в другой вкладке</text>
+
+  <line x1="172" y1="130" x2="243" y2="130" stroke="var(--ink-soft)" stroke-width="1.5" marker-start="url(#a2)" marker-end="url(#a2)"/>
+  <text x="207" y="122" class="m" text-anchor="middle">API</text>
+
+  <line x1="397" y1="110" x2="467" y2="70" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="440" y="114" class="m" text-anchor="middle">снимок</text>
+  <line x1="467" y1="196" x2="397" y2="154" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="440" y="160" class="m" text-anchor="middle">факт</text>
+
+  <line x1="320" y1="172" x2="320" y2="220" stroke="var(--recs)" stroke-width="1.6" marker-start="url(#a2)" marker-end="url(#a2)"/>
+  <text x="330" y="200" class="m">BroadcastChannel</text>
+</svg>
+<figcaption>Читатели никогда не трогают хранилище Корзины напрямую: ни её бэкенд, ни её localStorage. Всё идёт через владельца.</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th>Уровень</th><th>Кто</th><th>Что делает</th></tr></thead>
+  <tbody>
+    <tr><td>Источник истины</td><td>Бэкенд домена, у каждого МФ свой BFF той же команды<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a></td><td>Переживает перезагрузку, вкладки и устройства</td></tr>
+    <tr><td>Владелец на клиенте</td><td>МФ Корзины</td><td>Единственный, кто меняет данные. Держит кэш, рассылает снимки</td></tr>
+    <tr><td>Читатели</td><td>Все остальные МФ</td><td>Получают копию через события и ничего не пишут</td></tr>
+  </tbody>
+</table>
+
+<h2>Четыре проблемы — четыре приёма</h2>
+
+<div class="problem"><span class="n">1</span><div>
+  <h3>Компонент умер — данные умерли</h3>
+  <p><strong>Приём: состояние живёт дольше компонента.</strong> При монтировании владелец поднимает его из своего хранилища. В проде это запрос к бэкенду корзины, в нашем демо его заменяет <code>localStorage</code>. Ключ с префиксом команды и версией: <code>polka:cart:v1</code>. Версия нужна потому, что формат хранилища тоже контракт, пусть и внутренний.</p>
+</div></div>
+
+<div class="problem"><span class="n">2</span><div>
+  <h3>Опоздавший подписчик</h3>
+  <p>«Рекомендации» смонтировались через минуту и пропустили все события. <strong>Приём: «снимок + изменения» и рукопожатие в обе стороны.</strong></p>
+  <ul>
+    <li>События несут <em>снимок</em> (<code>{count: 3, total: 1790}</code>), а не дельту (<code>+1</code>). Одного любого события достаточно, чтобы получить верную картину.</li>
+    <li>Читатель при монтировании просит снимок: <code>cart:state-request</code>.</li>
+    <li>Владелец при монтировании сам объявляет снимок. Так покрываются оба порядка загрузки: кто бы ни пришёл позже, он запускает синхронизацию.</li>
+  </ul>
+<pre><code><span class="c">// Читатель (Рекомендации)</span>
+window.addEventListener('cart:changed', (e) => show(e.detail.count))
+window.dispatchEvent(new CustomEvent('cart:state-request'))   <span class="c">// «владелец, пришли снимок»</span>
+
+<span class="c">// Владелец (Корзина)</span>
+window.addEventListener('cart:state-request', announce)
+announce()                                                     <span class="c">// «я загрузился, вот состояние»</span></code></pre>
+  <p class="aside">Заметьте: у атрибутов из урока 1 этой проблемы нет. Атрибут — это <em>состояние</em>, он всегда хранит текущее значение. Событие — это <em>момент</em>, и его можно пропустить. Если данные приходят от Shell, атрибут проще события.</p>
+</div></div>
+
+<div class="problem"><span class="n">3</span><div>
+  <h3>Действие пользователя потерялось</h3>
+  <p><strong>Приём: подтверждение приёма.</strong> <code>dispatchEvent</code> вызывает обработчики синхронно и возвращает <code>false</code>, если событие было <code>cancelable</code> и кто-то вызвал <code>preventDefault()</code><a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">[3]</a>. Владелец ставит этим «печать: принято». Нет печати — Каталог честно говорит пользователю, что корзина недоступна.</p>
+<pre><code><span class="c">// Каталог</span>
+const notHandled = this.dispatchEvent(new CustomEvent('catalog:add-to-cart',
+  { detail, bubbles: true, composed: true, cancelable: true }))
+if (notHandled) showWarning('Корзина сейчас недоступна')
+
+<span class="c">// Корзина</span>
+window.addEventListener('catalog:add-to-cart', (e) => { e.preventDefault(); add(e.detail) })</code></pre>
+</div></div>
+
+<div class="problem"><span class="n">4</span><div>
+  <h3>Две вкладки разъехались</h3>
+  <p><strong>Приём: владелец синхронизирует сам себя через <code>BroadcastChannel</code>.</strong> Это именованный канал между документами одного origin: вкладками, окнами, iframe<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel">[4]</a>. Сообщение получают все подписанные объекты, «кроме объекта, который его отправил»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel">[4]</a>, поэтому эхо-цикла не будет. Канал слушает и пишет только владелец. Получив сообщение, он обновляет себя и уже локально объявляет <code>cart:changed</code> своим читателям.</p>
+  <p>Честная оговорка: если две вкладки меняют корзину почти одновременно, побеждает последняя запись. Я поймал это в автотесте демо. Поэтому BroadcastChannel — быстрая оптимистичная синхронизация интерфейса, а не замена источника истины. Конфликты разрешает бэкенд.</p>
+  <p class="aside">Альтернатива — событие <code>storage</code> на <code>localStorage</code>: оно «не срабатывает в окне, которое сделало изменение»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Window/storage_event">[5]</a>, только в других вкладках того же origin. Ловушка, которую я проверил на практике: на страницах <code>file://</code> в Chrome BroadcastChannel сообщения не доставляет, нужен настоящий origin вроде <code>http://localhost</code>.</p>
+</div></div>
+
+<h2>Эксперимент: v1 против v2</h2>
+<p>Та же «Полка», но теперь у неё две версии. <strong>v1</strong> — наивная из урока 1. <strong>v2</strong> — с четырьмя приёмами. Плюс новый МФ «Рекомендации» (Svelte), который можно смонтировать в любой момент.</p>
+
+<div class="callout" id="file-warning">
+  <span class="label">Откройте урок через сервер</span>
+  <p>Урок открыт как файл, поэтому шаг 4 со вкладками не заработает. В папке курса выполните <code>./serve.sh</code> и откройте <code>http://localhost:8137/lessons/0002-state-sync.html</code>.</p>
+</div>
+
+<polka-app id="demo" with-recs></polka-app>
+<div class="demo-controls no-print">
+  <span class="seg" role="group" aria-label="Версия"><button type="button" data-mode="naive">v1 · наивная</button><button type="button" data-mode="owned">v2 · по правилам</button></span>
+  <span class="sep"></span>
+  <button type="button" id="recs">Смонтировать Рекомендации</button>
+  <button type="button" id="cart">Уронить МФ корзины</button>
+  <a class="btn" id="tab2" href="?v=2#/catalog" target="_blank" rel="noopener">Вторая вкладка ↗</a>
+</div>
+<mf-event-log listen="catalog:add-to-cart cart:changed cart:state-request" watch="#demo" attrs="user genre" url broadcast="polka-cart"></mf-event-log>
+
+<h3>Четыре шага. Перед каждым сначала предскажите результат</h3>
+<p class="aside">Размытый текст — ответ. Кликните по нему, только когда сделаете ставку и проверите в демо.</p>
+<ol class="steps">
+  <li><b>v1.</b> Добавьте две книги, затем смонтируйте Рекомендации. <span class="predict">Что они покажут?</span> <span class="reveal" tabindex="0">Они честно скажут «не знаю»: всё, что было до них, они пропустили.</span></li>
+  <li>Переключитесь на <b>v2</b>, добавьте книгу, затем выгрузите и снова смонтируйте Рекомендации. <span class="predict">Сколько событий появится в журнале?</span> <span class="reveal" tabindex="0">Должны появиться два: <code>cart:state-request</code> → <code>cart:changed</code>. Это рукопожатие.</span></li>
+  <li>В v2 уроните Корзину и нажмите «В корзину». <span class="predict">Что увидит пользователь?</span> Потом верните Корзину. <span class="predict">Что покажет счётчик?</span> <span class="reveal" tabindex="0">Каталог предупредит, что книга не добавлена, а после возврата счётчик сохранит прежнее значение. В уроке 1 было 0 и тишина.</span></li>
+  <li>Откройте <b>вторую вкладку</b> (она сразу в v2) и положите книгу там. Вернитесь сюда. В журнале появится <code>вкладка ⇆</code>, а счётчик и Рекомендации обновятся. Обратите внимание, кто на это реагирует: только Корзина, а Рекомендации узнали об изменении от неё обычным событием.</li>
+</ol>
+
+<h2>Проверьте себя</h2>
+<p>Два последних вопроса — из урока 1. Перемешивание тем осознанное: так знания лучше держатся.</p>
+
+<div class="quiz" data-quiz>
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt">Почему <code>cart:changed</code> несёт <code>{count, total}</code>, а не <code>{delta: +1}</code>?</p>
+    <button data-key="a">Браузер не передаёт числа со знаком</button>
+    <button data-key="b">Любое одно событие даёт верную картину</button>
+    <button data-key="c">Так требует контракт BroadcastChannel между вкладками</button>
+    <button data-key="d">Снимок занимает меньше памяти, чем дельта</button>
+    <p class="quiz-explain">С дельтами читатель должен увидеть <em>все</em> события с самого начала, а опоздавший или пропустивший одно событие разойдётся навсегда. Снимок самодостаточен: последнего события хватает.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt">Рекомендации смонтировались через минуту после загрузки страницы. Как им узнать число книг в корзине?</p>
+    <button data-key="a">Ждать следующего изменения корзины от пользователя</button>
+    <button data-key="b">Прочитать localStorage корзины по её ключу</button>
+    <button data-key="c">Вести собственную копию корзины с запуска</button>
+    <button data-key="d">Запросить снимок событием у владельца корзины</button>
+    <p class="quiz-explain">Ключ <code>polka:cart:v1</code> — внутренняя деталь команды Корзины. Прочитав его напрямую, Рекомендации сломаются, когда Корзина сменит формат или перейдёт на бэкенд. Ожидание оставляет экран неверным неопределённо долго. Собственная копия — второй источник истины.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt">Каталог отправил <code>cancelable</code>-событие <code>catalog:add-to-cart</code>, и <code>dispatchEvent</code> вернул <code>true</code>. Что это значит?</p>
+    <button data-key="a">Никто не подтвердил приём этого события</button>
+    <button data-key="b">Корзина успешно добавила книгу в заказ</button>
+    <button data-key="c">Событие ещё не дошло до слушателей</button>
+    <button data-key="d">Браузер отклонил событие из-за Shadow DOM</button>
+    <p class="quiz-explain"><code>false</code> означает «кто-то вызвал <code>preventDefault()</code>», то есть подтверждение. <code>true</code> — подтверждения нет. Ответа «ещё не дошло» не бывает: <code>dispatchEvent</code> вызывает обработчики синхронно, до возврата<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">[3]</a>.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Кто в «Полке» пишет сообщения в BroadcastChannel <code>polka-cart</code>?</p>
+    <button data-key="a">Каждый МФ, которому интересна корзина</button>
+    <button data-key="b">Shell, ведь он видит все вкладки</button>
+    <button data-key="c">Только Корзина, владелец этих данных</button>
+    <button data-key="d">Каталог, ведь добавление начинается в нём</button>
+    <p class="quiz-explain">Синхронизация между вкладками — это синхронизация владельца с самим собой. Остальные МФ узнают об изменениях от своей локальной Корзины через обычное <code>cart:changed</code>, поэтому им не нужно знать про вкладки. К тому же Shell вкладок не «видит»: у каждой вкладки свой Shell.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt"><span class="team shell">урок 1</span> Shell хочет сообщить Каталогу выбранную валюту (₽ или $). Какой канал лучше?</p>
+    <button data-key="a">Событие, которое Каталог должен успеть поймать</button>
+    <button data-key="b">Атрибут currency, который Shell ставит Каталогу</button>
+    <button data-key="c">Глобальная переменная, которую читают все МФ</button>
+    <button data-key="d">Ключ в localStorage, который читает Каталог</button>
+    <p class="quiz-explain">Валютой владеет Shell, а Каталог — его ребёнок. Атрибут всегда хранит текущее значение, поэтому проблемы опоздавшего подписчика нет вовсе. Событие здесь хуже: Каталог, смонтированный позже, его пропустит.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt"><span class="team shell">урок 1</span> Почему корзину не стоит хранить в общем store внутри Shell?</p>
+    <button data-key="a">Store в Shell работает медленнее событий</button>
+    <button data-key="b">Браузер запрещает общий store между бандлами</button>
+    <button data-key="c">Store нельзя синхронизировать между вкладками браузера</button>
+    <button data-key="d">Shell начинает владеть данными чужого домена</button>
+    <p class="quiz-explain">Технически это возможно, и в этом соблазн. Но тогда команда Корзины не может поменять формат своих данных без релиза Shell, а независимая поставка — главное, ради чего затевались микрофронтенды.</p>
+  </div>
+  <p class="quiz-score" aria-live="polite"></p>
+</div>
+
+<h2>Тренировка для собеседования</h2>
+<p>60 секунд, вслух, затем сверьтесь:</p>
+<p><em>«Корзина живёт в одном микрофронтенде, а количество товаров нужно показывать ещё в трёх. Как синхронизируете? Что будет, если какой-то из них загрузится позже?»</em></p>
+<details>
+  <summary>Образец ответа</summary>
+  <p>У корзины один владелец — МФ корзины. Источник истины — её бэкенд, а на клиенте владелец держит кэш и единственный меняет данные. Остальные МФ — читатели: они слушают событие <code>cart:changed</code>, где лежит снимок (количество, сумма), а не дельта, поэтому одного события хватает. Для тех, кто загрузился позже, есть рукопожатие: читатель при монтировании просит снимок событием, а владелец при своём монтировании сам его объявляет, так что порядок загрузки не важен. Команды «добавь в корзину» владелец подтверждает через <code>preventDefault</code>, и без подтверждения отправитель показывает ошибку, а не теряет действие молча. Вкладки владелец синхронизирует сам через BroadcastChannel. Общего store нет: иначе Shell владел бы чужим доменом.</p>
+</details>
+
+<div class="source">
+  <span class="label">Главный источник к уроку</span>
+  <p style="margin:0"><a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a>: перечитайте <em>Cross-application communication</em> и прочитайте <em>Backend communication</em> (про BFF и источник истины). Затем короткая страница <a href="https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel">MDN: BroadcastChannel</a>.</p>
+</div>
+
+<p>Шпаргалки: <a href="../reference/state-sync.html">Синхронизация состояния</a> · <a href="../reference/communication-channels.html">Каналы связи</a>.</p>
+
+<div class="ask">Вопросы вроде «а если владелец — бэкенд, зачем вообще клиентский кэш?» или «как это сделать в React/Vue, а не на Custom Elements?» задавайте преподавателю (агенту) прямо в чате.</div>
+
+<nav class="course-nav">
+  <a href="0001-anatomy-and-channels.html">← Урок 1 · Анатомия и каналы связи</a>
+  <a href="0003-module-federation.html">Урок 3 · Module Federation →</a>
+</nav>
+
+</main>
+<script>
+  // Вторая вкладка открывается сразу в v2. Режим ставим до того, как определятся МФ.
+  if (new URLSearchParams(location.search).get("v") === "2") document.getElementById("demo").setAttribute("mode", "owned");
+  if (location.protocol === "file:") document.getElementById("file-warning").style.display = "block";
+</script>
+<script src="../assets/event-log.js"></script>
+<script src="../assets/polka-demo.js"></script>
+<script src="../assets/quiz.js"></script>
+<script src="../assets/reveal.js"></script>
+<script>
+  const app = document.getElementById("demo");
+  const modeBtns = document.querySelectorAll("[data-mode]");
+  const syncMode = () => modeBtns.forEach((b) => b.setAttribute("aria-pressed", String((app.getAttribute("mode") || "naive") === b.dataset.mode)));
+  modeBtns.forEach((b) => b.onclick = () => { app.setMode(b.dataset.mode); syncMode(); });
+  syncMode();
+
+  const recsBtn = document.getElementById("recs");
+  recsBtn.onclick = () => { app.setRecsEnabled(!app.recsEnabled); recsBtn.textContent = app.recsEnabled ? "Выгрузить Рекомендации" : "Смонтировать Рекомендации"; };
+
+  const cartBtn = document.getElementById("cart");
+  cartBtn.onclick = () => { app.setCartEnabled(!app.cartEnabled); cartBtn.textContent = app.cartEnabled ? "Уронить МФ корзины" : "Вернуть МФ корзины"; };
+</script>
+</body>
+</html>

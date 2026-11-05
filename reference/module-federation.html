@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module Federation</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Module Federation</h1>
+<p class="lede">Runtime-интеграция: remote публикует витрину, а хост по <code>import()</code> подгружает код по сети и делит с ним зависимости.</p>
+
+<h2>Термины</h2>
+<table>
+  <tbody>
+    <tr><td><strong>host</strong></td><td>Потребляет чужие модули во время работы (<code>remotes</code>)</td></tr>
+    <tr><td><strong>remote</strong></td><td>Отдаёт модули наружу (<code>exposes</code>)</td></tr>
+    <tr><td><strong>exposes</strong></td><td>Публичный контракт remote: имя → файл. Всё прочее — внутреннее</td></tr>
+    <tr><td><strong>remoteEntry.js</strong> / <strong>mf-manifest.json</strong></td><td>Витрина remote: exposes, shared, publicPath. Имя стабильно между деплоями, поэтому его не кэшируют надолго</td></tr>
+    <tr><td><strong>shared</strong></td><td>Зависимости, которые загружаются один раз на всех</td></tr>
+  </tbody>
+</table>
+
+<h2>Конфиг (Vite, <code>@module-federation/vite</code>)</h2>
+<pre><code><span class="c">// remote</span>
+federation({ name: 'catalog', filename: 'remoteEntry.js', manifest: true,
+  exposes: { './Catalog': './src/Catalog.jsx' },
+  shared: { react: { singleton: true }, 'react-dom': { singleton: true } } })
+<span class="c">// + base: 'https://cdn/catalog/'  — чтобы чанки грузились с сервера remote</span>
+
+<span class="c">// host</span>
+federation({ name: 'shell',
+  remotes: { catalog: { type: 'module', name: 'catalog', entry: 'https://cdn/catalog/remoteEntry.js' } },
+  shared: { react: { singleton: true }, 'react-dom': { singleton: true } } })
+
+<span class="c">// использование в host</span>
+const Catalog = lazy(() =&gt; import('catalog/Catalog'))</code></pre>
+
+<h2>Опции shared</h2>
+<table>
+  <tbody>
+    <tr><td><code>singleton: true</code></td><td>Одна версия на страницу. При расхождении берётся старшая, младшая сторона получает предупреждение</td></tr>
+    <tr><td><code>requiredVersion</code></td><td>Допустимый диапазон. По умолчанию — версия из зависимостей приложения</td></tr>
+    <tr><td><code>eager: true</code></td><td>Загрузить сразу, в начальном бандле. Только если модуль нужен синхронно при старте</td></tr>
+    <tr><td><code>import: false</code></td><td>Не класть свою копию как fallback, а брать только у хоста</td></tr>
+  </tbody>
+</table>
+
+<h2>Два способа встроить remote</h2>
+<table>
+  <thead><tr><th></th><th>Компонент</th><th><code>mount(el) → unmount</code></th></tr></thead>
+  <tbody>
+    <tr><td>Когда</td><td>Хост и remote на одном фреймворке</td><td>Фреймворки разные или неважны</td></tr>
+    <tr><td>Требует</td><td>shared singleton фреймворка</td><td>Ничего, кроме DOM-узла</td></tr>
+    <tr><td>Цена</td><td>Связь по версии фреймворка</td><td>Каждый remote везёт свой рантайм</td></tr>
+  </tbody>
+</table>
+
+<h2>Ошибки, которые мы видели вживую</h2>
+<table>
+  <thead><tr><th>Симптом</th><th>Причина</th><th>Что делать</th></tr></thead>
+  <tbody>
+    <tr><td><code>RUNTIME-008 Failed to load script resources</code></td><td>remoteEntry.js недоступен</td><td>Error boundary / <code>.catch()</code> вокруг <code>import()</code> и заглушка</td></tr>
+    <tr><td><code>Cannot read properties of null (reading 'useState')</code> / invalid hook call</td><td>Две копии React: нет <code>shared</code> или не <code>singleton</code></td><td><code>shared: { react: { singleton: true }, 'react-dom': … }</code> у обеих сторон</td></tr>
+    <tr><td><code>DataCloneError</code> в <code>postMessage</code></td><td>Через границу ушёл Proxy фреймворка (реактивность Vue)</td><td>Отправлять простые данные (JSON-копию)</td></tr>
+    <tr><td>DTS: <code>tsconfig.json does not exist</code></td><td>Генерация типов в JS-проекте</td><td><code>dts: false</code></td></tr>
+  </tbody>
+</table>
+
+<p class="aside">Источники: <a href="https://module-federation.io/guide/start/index.html">module-federation.io</a> · <a href="https://module-federation.io/configure/shared.html">shared</a> · <a href="https://github.com/module-federation/vite">@module-federation/vite</a> · <a href="https://react.dev/warnings/invalid-hook-call-warning">react.dev: invalid hook call</a>. Урок: <a href="../lessons/0003-module-federation.html">3 · Module Federation</a>. Код: <code>playground/</code>.</p>
+</main>
+</body>
+</html>

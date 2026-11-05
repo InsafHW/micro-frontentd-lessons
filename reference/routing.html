@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Роутинг между МФ</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Роутинг между микрофронтендами</h1>
+<p class="lede">Один адрес, одна история, один писатель. Префикс принадлежит Shell, хвост — МФ.</p>
+
+<h2>Кто за что отвечает</h2>
+<table>
+  <thead><tr><th>Часть</th><th>Владелец</th><th>Пример</th></tr></thead>
+  <tbody>
+    <tr><td>Префикс → какой МФ, 404 верхнего уровня, редирект с <code>/</code></td><td>Shell</td><td><code>/catalog</code> → Каталог</td></tr>
+    <tr><td>Хвост → что показать, «не найдено» внутри</td><td>МФ</td><td><code>/book/dune</code> → «Дюна»</td></tr>
+    <tr><td>Смена адреса</td><td>Через контракт Shell</td><td><code>navigate(to)</code> или общий <code>history</code></td></tr>
+    <tr><td>Index.html на любой путь</td><td>Сервер / CDN</td><td>Глубокие ссылки и F5</td></tr>
+  </tbody>
+</table>
+
+<h2>Контракт (props / аргументы mount)</h2>
+<pre><code>&lt;Catalog basename="/catalog" path={path} navigate={navigate} /&gt;   <span class="c">// компонент</span>
+mount(el, { navigate })                                            <span class="c">// любой фреймворк</span>
+
+<span class="c">// Shell</span>
+const navigate = (to) =&gt; { history.pushState(null, '', to); setPath(to) }
+addEventListener('popstate', () =&gt; setPath(location.pathname))     <span class="c">// «Назад» / «Вперёд»</span>
+
+<span class="c">// страховка (Navigation API, Baseline 2026): ловит и push, и replace, и traverse</span>
+navigation?.addEventListener('currententrychange', () =&gt; setPath(location.pathname))</code></pre>
+
+<h2>Факты</h2>
+<ul>
+  <li><code>pushState()</code> / <code>replaceState()</code> <strong>не</strong> вызывают <code>popstate</code>. Он срабатывает только на действия браузера: «Назад», «Вперёд», <code>history.back()</code>.</li>
+  <li>Navigation API: событие <code>navigate</code> до перехода (на первой загрузке не срабатывает), <code>currententrychange</code> после. В Chrome оба срабатывают и на <code>pushState</code>.</li>
+  <li>Маршруты, на которые ссылаются другие команды, — контракт. Его покрывают тестами и меняют через переходный период с редиректами.</li>
+</ul>
+
+<h2>Симптомы</h2>
+<table>
+  <thead><tr><th>Симптом</th><th>Причина</th></tr></thead>
+  <tbody>
+    <tr><td>Адрес сменился, экран нет. После F5 всё правильно</td><td>Переход в обход контракта (прямой <code>pushState</code> из МФ)</td></tr>
+    <tr><td>404 от сервера на F5</td><td>Сервер не отдаёт index.html Shell на вложенный путь</td></tr>
+    <tr><td>Ссылка перезагружает всю страницу</td><td><code>&lt;a href&gt;</code> без перехвата клика и <code>navigate</code></td></tr>
+    <tr><td>Ссылка из Корзины ведёт в никуда после релиза Каталога</td><td>Сломан контракт маршрутов: нет теста и редиректа</td></tr>
+  </tbody>
+</table>
+
+<p class="aside">Источники: <a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event">MDN: popstate</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">MDN: Navigation API</a>. Урок: <a href="../lessons/0004-routing.html">4 · Роутинг</a>. Код: <code>playground/shell/src/router.js</code>.</p>
+</main>
+</body>
+</html>
