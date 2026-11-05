@@ -28,6 +28,13 @@
 - [react.dev: Component → Error Boundary](https://react.dev/reference/react/Component) · [Vue: app.config.errorHandler](https://vuejs.org/api/application.html) · [Vue: scoped CSS](https://vuejs.org/api/sfc-css-features.html) · [Vite: CSS Modules](https://vite.dev/guide/features.html) · [MDN: Using shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM)
   Что ловят границы ошибок и как изолируются стили. Use for: урок 5.
 
+- [Thoughtworks Radar: Micro frontends (Adopt, 2020)](https://www.thoughtworks.com/radar/techniques/micro-frontends) · [Micro-frontend anarchy (Hold, Oct 2020)](https://www.thoughtworks.com/radar/techniques/micro-frontend-anarchy)
+  Позиция консалтинга с большим опытом внедрений. Use for: аргумент против смешения фреймворков без стратегии перехода.
+- [Martin Fowler: MonolithFirst (2015)](https://martinfowler.com/bliki/MonolithFirst.html) · [Conway's Law (2022)](https://martinfowler.com/bliki/ConwaysLaw.html)
+  Почему границы трудно провести сразу и почему архитектура повторяет оргструктуру. Use for: «когда не нужны».
+- [Shopify Engineering: Deconstructing the Monolith (2019)](https://shopify.engineering/deconstructing-monolith-designing-software-maximizes-developer-productivity)
+  Определение и опыт модульного монолита. Use for: альтернатива МФ.
+
 ## Wisdom (Communities)
 
 - [Module Federation — GitHub Discussions](https://github.com/module-federation/core/discussions)
@@ -37,4 +44,4 @@
 
 ## Gaps
 
-- Нужен хороший разбор реального продакшен-кейса (почему компания пришла или отказалась). Найти в следующих сессиях.
+- Нужен хороший разбор реального продакшен-кейса фронтенда (почему компания пришла к МФ или отказалась). Shopify — про бэкенд-монолит; фронтенд-кейс всё ещё не найден.

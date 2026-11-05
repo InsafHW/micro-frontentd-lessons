@@ -13,7 +13,9 @@
     "start": "npm run build && node scripts/preview-all.mjs",
     "preview": "node scripts/preview-all.mjs",
     "preview:no-catalog": "node scripts/preview-all.mjs shell cart",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:monolith": "vite build -c monolith/vite.config.ts",
+    "preview:monolith": "vite preview -c monolith/vite.config.ts"
   },
   "devDependencies": {
     "typescript": "^6.0.3"

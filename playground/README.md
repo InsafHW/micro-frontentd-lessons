@@ -13,6 +13,7 @@ npm install
 npm start                  # собрать всё и поднять три preview-сервера → http://localhost:5170
 npm run build -w catalog   # «задеплоить» только Каталог (Shell и Корзина не трогаются)
 npm run preview:no-catalog # поднять всё, кроме Каталога («его сервер лежит»)
+npm run build:monolith && npm run preview:monolith   # тот же код как модульный монолит → http://localhost:5180 (урок 6)
 npm run typecheck          # проверить типы во всех трёх приложениях (build делает это сам)
 ```
 

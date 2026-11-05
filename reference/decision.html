@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Нужны ли микрофронтенды</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Нужны ли микрофронтенды</h1>
+<p class="lede">МФ решают проблему масштабирования команд. Границы в коде нужны всегда, отдельный деплой — только когда за ним стоят разные команды с разным ритмом.</p>
+
+<h2>Сигналы</h2>
+<table>
+  <thead><tr><th>За микрофронтенды</th><th>Против</th></tr></thead>
+  <tbody>
+    <tr><td>Много команд на одном UI, боль именно в совместном релизе</td><td>Одна или несколько команд, общий релиз никому не мешает</td></tr>
+    <tr><td>Стабильные <em>вертикальные</em> домены, у команд свои бэкенды / BFF</td><td>Домены ещё ищутся (стартап, прототип) — Monolith First</td></tr>
+    <tr><td>Каждой команде нужен свой ритм релизов и отката</td><td>Части постоянно делят состояние (редактор, сложная форма)</td></tr>
+    <tr><td>Постепенная миграция с легаси (стратегия перехода)</td><td>Жёсткий бюджет производительности</td></tr>
+    <tr><td>Есть команда платформы для Shell, CI, мониторинга</td><td>Мотив «каждый пишет на любимом фреймворке» (Radar: anarchy → Hold)</td></tr>
+  </tbody>
+</table>
+
+<h2>Варианты</h2>
+<table>
+  <thead><tr><th>Архитектура</th><th>Когда</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Простой монолит</strong></td><td>Мало людей, границы неизвестны, главное — скорость изменений</td></tr>
+    <tr><td><strong>Модульный монолит</strong></td><td>Боль в связанности кода, а не в релизе. Строгие границы, контракты, один деплой</td></tr>
+    <tr><td><strong>Микрофронтенды</strong></td><td>Боль в совместном релизе при стабильных вертикальных доменах</td></tr>
+    <tr><td><strong>МФ как стратегия перехода</strong></td><td>Легаси + новый стек: новое рядом со старым, Shell переключает маршруты</td></tr>
+  </tbody>
+</table>
+
+<h2>Цена на нашем стенде (тот же код)</h2>
+<table>
+  <thead><tr><th></th><th>Запросов</th><th>Передано</th></tr></thead>
+  <tbody>
+    <tr><td>Module Federation, 3 сервера</td><td>38</td><td>208,7 КБ</td></tr>
+    <tr><td>Модульный монолит, 1 сборка</td><td>8</td><td>99,6 КБ</td></tr>
+  </tbody>
+</table>
+<p>Плюс операционная цена: <code>shared</code> и версии, доступность remote, рассинхрон роутинга, утечки CSS, ошибки между фреймворками, ручные контракты.</p>
+
+<h2>Порядок решения</h2>
+<ol>
+  <li>Где боль: в <em>коде</em> (связанность) или в <em>поставке</em> (общий релиз)?</li>
+  <li>Код → модульный монолит: границы, владельцы, контракты, запрет импортов через границы.</li>
+  <li>Поставка → вертикальны ли и стабильны ли домены? Нет → сначала найти границы в монолите.</li>
+  <li>Да → вынести один самый независимый домен в remote, проверить Shell, контракты, деплой и мониторинг.</li>
+  <li>Сразу договориться о стандартах: основной фреймворк, токены стилей, события, маршруты.</li>
+</ol>
+
+<p class="aside">Источники: <a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a> · <a href="https://martinfowler.com/bliki/MonolithFirst.html">MonolithFirst</a> · <a href="https://martinfowler.com/bliki/ConwaysLaw.html">Conway's Law</a> · <a href="https://www.thoughtworks.com/radar/techniques/micro-frontend-anarchy">Radar: micro-frontend anarchy</a> · <a href="https://shopify.engineering/deconstructing-monolith-designing-software-maximizes-developer-productivity">Shopify: Deconstructing the Monolith</a>. Урок: <a href="../lessons/0006-when-not-to.html">6 · Когда МФ не нужны</a>. Код: <code>playground/monolith/</code>.</p>
+</main>
+</body>
+</html>
