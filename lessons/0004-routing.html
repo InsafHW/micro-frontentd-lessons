@@ -27,7 +27,7 @@
 
 <h2>Разминка: урок 3</h2>
 <p>Почему Shell может рендерить <code>&lt;Catalog /&gt;</code> только при <code>shared: { react: { singleton: true } }</code>, а для Корзины через <code>mount(el)</code> это не нужно? Ответьте, потом откройте.</p>
-<p class="reveal">Компонент Каталога рендерит <code>react-dom</code> Shell, и хуки должны обращаться к той же копии React, иначе <code>useState</code> of null. При <code>mount(el)</code> remote рендерит сам, своей собственной парой React + ReactDOM (или Vue), так что всё согласовано. Цена — две копии фреймворка на странице. Вы как раз проверяли это своим <code>catalog/src/mount.jsx</code>.</p>
+<p class="reveal">Компонент Каталога рендерит <code>react-dom</code> Shell, и хуки должны обращаться к той же копии React, иначе <code>useState</code> of null. При <code>mount(el)</code> remote рендерит сам, своей собственной парой React + ReactDOM (или Vue), так что всё согласовано. Цена — две копии фреймворка на странице. Вы как раз проверяли это своим <code>catalog/src/mount.tsx</code>.</p>
 
 <h2>Два уровня одного адреса</h2>
 <figure>
@@ -51,7 +51,7 @@
   <text x="370" y="129" class="s">свои подмаршруты, своя логика</text>
 </svg>
 </figure>
-<p>Так устроен пример в канонической статье. Контейнер сопоставляет URL со списком маршрутов и решает, какой МФ монтировать. А «собственная логика роутинга» МФ потом извлекает из URL ID ресторана и показывает нужное<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. В «Полке» таблица Shell — это два префикса (<a href="../playground/shell/src/router.js">shell/src/router.js</a>), а <code>/book/:sku</code> знает только Каталог.</p>
+<p>Так устроен пример в канонической статье. Контейнер сопоставляет URL со списком маршрутов и решает, какой МФ монтировать. А «собственная логика роутинга» МФ потом извлекает из URL ID ресторана и показывает нужное<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. В «Полке» таблица Shell — это два префикса (<a href="../playground/shell/src/router.ts">shell/src/router.ts</a>), а <code>/book/:sku</code> знает только Каталог.</p>
 
 <h2>Три правила</h2>
 <ol class="rules">
@@ -76,7 +76,7 @@
 </ol>
 
 <h3>Задача на код: страховочная сетка</h3>
-<p>Сделайте так, чтобы Shell замечал <em>любую</em> смену адреса, даже в обход <code>navigate()</code>, и шаг 3 перестал ломаться. Подсказка: Navigation API, «преемник History API, нацеленный на нужды SPA»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">[3]</a>. Нужно событие, которое срабатывает <em>после</em> смены текущей записи истории. Правьте <code>shell/src/router.js</code>, затем выполните <code>npm run build -w shell</code> и повторите шаг 3.</p>
+<p>Сделайте так, чтобы Shell замечал <em>любую</em> смену адреса, даже в обход <code>navigate()</code>, и шаг 3 перестал ломаться. Подсказка: Navigation API, «преемник History API, нацеленный на нужды SPA»<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API">[3]</a>. Нужно событие, которое срабатывает <em>после</em> смены текущей записи истории. Правьте <code>shell/src/router.ts</code>, затем выполните <code>npm run build -w shell</code> и повторите шаг 3.</p>
 <details>
   <summary>Решение (проверено на нашем стенде)</summary>
 <pre><code>useEffect(() =&gt; {
@@ -144,7 +144,7 @@
     <button data-key="b">Общий модуль состояния внутри одного МФ</button>
     <button data-key="c">Через cart:changed, как чужие микрофронтенды</button>
     <button data-key="d">Через localStorage, читая его по таймеру</button>
-    <p class="quiz-explain">Правило «нет общего состояния» действует <em>между командами</em>. Внутри одного МФ один владелец, и общий модуль — норма: в playground это <a href="../playground/cart/src/store.js">cart/src/store.js</a>. Оба exposes одного remote используют один экземпляр этого модуля.</p>
+    <p class="quiz-explain">Правило «нет общего состояния» действует <em>между командами</em>. Внутри одного МФ один владелец, и общий модуль — норма: в playground это <a href="../playground/cart/src/store.ts">cart/src/store.ts</a>. Оба exposes одного remote используют один экземпляр этого модуля.</p>
   </div>
   <p class="quiz-score" aria-live="polite"></p>
 </div>

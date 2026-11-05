@@ -88,19 +88,19 @@
 
 <h2>Конфиг: две стороны одного контракта</h2>
 <div class="pair">
-  <div><p class="cap">catalog/vite.config.js · remote</p>
+  <div><p class="cap">catalog/vite.config.ts · remote</p>
 <pre><code>federation({
   name: 'catalog',
   filename: 'remoteEntry.js',
   exposes: {
-    './Catalog': './src/Catalog.jsx',
+    './Catalog': './src/Catalog.tsx',
   },
   shared: {
     react: { singleton: true },
     'react-dom': { singleton: true },
   },
 })</code></pre></div>
-  <div><p class="cap">shell/vite.config.js · host</p>
+  <div><p class="cap">shell/vite.config.ts · host</p>
 <pre><code>federation({
   name: 'shell',
   remotes: {
@@ -142,13 +142,13 @@ npm start        <span class="c"># собрать всё и поднять 3 с�
 
 <ol class="steps">
   <li><b>Посмотрите на Network.</b> Откройте DevTools → Network, обновите страницу и найдите <code>remoteEntry.js</code> с портов 5171 и 5172. <span class="predict">Загрузится ли React с порта 5171?</span> <span class="reveal" tabindex="0">Нет. Метка Каталога показывает «общий с Shell ✓», а файлов react с 5171 в списке нет. Это singleton в действии.</span></li>
-  <li><b>Независимый деплой.</b> В <code>catalog/src/Catalog.jsx</code> переименуйте «Дюна» в «Дюна (новое издание)», затем:
+  <li><b>Независимый деплой.</b> В <code>catalog/src/Catalog.tsx</code> переименуйте «Дюна» в «Дюна (новое издание)», затем:
 <pre><code>npm run build -w catalog</code></pre>
   Обновите Shell. <span class="predict">Нужно ли пересобирать Shell?</span> <span class="reveal" tabindex="0">Нет. Shell знает только адрес remoteEntry.js, а свежий remoteEntry ссылается на новые чанки. Одна оговорка для прода: сам remoteEntry.js нельзя надолго кэшировать, ведь его имя не меняется между деплоями.</span></li>
   <li><b>Каталог лежит.</b> Остановите всё (Ctrl+C) и запустите без Каталога:
 <pre><code>npm run preview:no-catalog</code></pre>
   <span class="predict">Что будет со страницей и с Корзиной?</span> <span class="reveal" tabindex="0">Вместо Каталога появится заглушка «временно недоступен» от <code>RemoteBoundary</code> (error boundary в Shell). Корзина работает. В консоли будет <code>RUNTIME-008: Failed to load script resources</code>, и в ней ссылка на документацию.</span></li>
-  <li><b>Сломайте singleton.</b> Верните Каталог (<code>npm run preview</code>), удалите блок <code>shared</code> из <code>catalog/vite.config.js</code>, выполните <code>npm run build -w catalog</code> и обновите страницу. <span class="predict">Что сломается и где?</span> <span class="reveal" tabindex="0">Каталог упадёт с <code>Cannot read properties of null (reading 'useState')</code>: у него теперь своя копия React. Error boundary покажет заглушку, остальная страница жива. Верните <code>shared</code> и пересоберите Каталог.</span></li>
+  <li><b>Сломайте singleton.</b> Верните Каталог (<code>npm run preview</code>), удалите блок <code>shared</code> из <code>catalog/vite.config.ts</code>, выполните <code>npm run build -w catalog</code> и обновите страницу. <span class="predict">Что сломается и где?</span> <span class="reveal" tabindex="0">Каталог упадёт с <code>Cannot read properties of null (reading 'useState')</code>: у него теперь своя копия React. Error boundary покажет заглушку, остальная страница жива. Верните <code>shared</code> и пересоберите Каталог.</span></li>
 </ol>
 
 <p class="aside">Ещё одна находка с этого стенда. Сначала Корзина отправляла в BroadcastChannel <code>items.value</code> и падала с <code>DataCloneError</code>: Vue хранит данные в реактивных <code>Proxy</code>, и structured clone их не переносит. Мораль для собеседования: через границу МФ передаются <em>простые данные</em>, а не внутренние объекты фреймворка. Решение в <a href="../playground/cart/src/CartBadge.vue">CartBadge.vue</a>.</p>
@@ -162,7 +162,7 @@ npm start        <span class="c"># собрать всё и поднять 3 с�
     <button data-key="a">index.html с сервера Каталога</button>
     <button data-key="b">package.json из репозитория Каталога</button>
     <button data-key="c">remoteEntry.js с сервера Каталога</button>
-    <button data-key="d">vite.config.js из репозитория Каталога</button>
+    <button data-key="d">vite.config.ts из репозитория Каталога</button>
     <p class="quiz-explain">remoteEntry.js — это «витрина» remote: какие модули есть в exposes и что нужно из shared. Репозиторий Каталога хосту недоступен и не нужен: связь идёт только через задеплоенные файлы.</p>
   </div>
 
@@ -208,7 +208,7 @@ npm start        <span class="c"># собрать всё и поднять 3 с�
     <button data-key="b">Показать белый экран до восстановления</button>
     <button data-key="c">Перезагружать страницу каждые пять секунд</button>
     <button data-key="d">Загрузить Каталог из своего node_modules</button>
-    <p class="quiz-explain">Это та же устойчивость, что в уроке 1, только на уровне загрузки кода. В React её даёт error boundary вокруг <code>Suspense</code>, а для <code>mount</code> — <code>.catch()</code> у <code>import()</code>. Оба варианта есть в <a href="../playground/shell/src/App.jsx">shell/src/App.jsx</a>.</p>
+    <p class="quiz-explain">Это та же устойчивость, что в уроке 1, только на уровне загрузки кода. В React её даёт error boundary вокруг <code>Suspense</code>, а для <code>mount</code> — <code>.catch()</code> у <code>import()</code>. Оба варианта есть в <a href="../playground/shell/src/App.tsx">shell/src/App.tsx</a>.</p>
   </div>
   <p class="quiz-score" aria-live="polite"></p>
 </div>

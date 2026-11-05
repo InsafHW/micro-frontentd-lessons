@@ -1,0 +1,7 @@
+{
+  "name": "@polka/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Только типы: публичные контракты между МФ «Полки». В рантайм ничего не попадает.",
+  "types": "index.d.ts"
+}

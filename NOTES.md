@@ -19,6 +19,8 @@
 - Проверять playground через CDP-драйвер (scratchpad `cdp/run.mjs`, при новой сессии написать заново): headless Chrome + `--remote-debugging-port`, Runtime.evaluate. Осторожно: `pkill -f "vite preview"` убивает и собственный shell.
 - Найденные вживую грабли (в уроке 3): DataCloneError от Vue Proxy в BroadcastChannel; `useState` of null без shared singleton; RUNTIME-008 при недоступном remote; DTS-ошибки в JS-проекте → `dts: false`.
 
+- 2026-11-05: по просьбе пользователя playground переписан на TypeScript. TS 6.0.3 (не 7: в 7.0 нет JS API, ломает vue-tsc). Контракты — пакет `contracts/` (`@polka/contracts`, только .d.ts), Shell объявляет remote в `shell/src/remotes.d.ts`. `npm run typecheck`; build = typecheck + vite build. Пробел: `new CustomEvent(name)` не связан с типом detail → аннотировать detail явно. Возможная тема урока: типизация контрактов между МФ (явные контракты vs @mf-types).
+
 ## Сквозной пример: маркетплейс «Полка»
 Книжный магазин, 4 команды, смешанный стек:
 - **Shell** (команда платформы) — шапка, роутинг, авторизация, загрузка МФ

@@ -10,11 +10,11 @@ export default defineConfig({
     vue(),
     federation({
       name: 'cart',
-      dts: false,                          // JS-проект: генерация типов для remote не нужна
+      dts: false,                          // типы контрактов живут в @polka/contracts, генерация @mf-types не нужна
       filename: 'remoteEntry.js',
       manifest: true,
       exposes: {
-        './mount': './src/mount.js',   // mount (бейдж) и mountPage (страница /cart)
+        './mount': './src/mount.ts',   // mount (бейдж) и mountPage (страница /cart)
       },
       // Vue никто, кроме Корзины, не использует — делить нечего, shared не нужен.
     }),

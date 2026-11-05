@@ -1,8 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, version } from 'vue'
-import { items, total, start } from './store.js'
+import type { CartBadgeProps } from '@polka/contracts'
+import { items, total, start } from './store.ts'
 
-const props = defineProps({ navigate: Function })
+const props = defineProps<CartBadgeProps>()
 onMounted(start)
 const go = () => props.navigate ? props.navigate('/cart') : window.location.assign('/cart')
 </script>

@@ -9,12 +9,12 @@ export default defineConfig({
     react(),
     federation({
       name: 'catalog',
-      dts: false,                          // JS-проект: генерация типов для remote не нужна
+      dts: false,                          // типы контрактов живут в @polka/contracts, генерация @mf-types не нужна
       filename: 'remoteEntry.js',          // «витрина» remote: точка входа для хостов
       manifest: true,                      // + mf-manifest.json с описанием exposes/shared
       exposes: {
-        './mount': './src/mount.jsx',
-        './Catalog': './src/Catalog.jsx',  // публичный контракт команды. Всё прочее — внутреннее
+        './mount': './src/mount.tsx',
+        './Catalog': './src/Catalog.tsx',  // публичный контракт команды. Всё прочее — внутреннее
       },
       shared: {
         react: { singleton: true },        // один React на страницу — общий с Shell

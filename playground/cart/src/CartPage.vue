@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, version } from 'vue'
-import { items, total, start, removeAt, clear } from './store.js'
+import type { CartPageProps } from '@polka/contracts'
+import { items, total, start, removeAt, clear } from './store.ts'
 
 // navigate — контракт от Shell: «переведи пользователя по этому адресу».
 // Корзина не знает, кто отрисует /catalog/…, она знает только формат адреса (это и есть контракт маршрутов).
-const props = defineProps({ navigate: { type: Function, required: true } })
+const props = defineProps<CartPageProps>()
 onMounted(start)
 </script>
 

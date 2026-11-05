@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     federation({
       name: 'shell',
-      dts: false,                          // JS-проект: генерация типов для remote не нужна
+      dts: false,                          // типы remote объявлены в src/remotes.d.ts по @polka/contracts
       remotes: {
         catalog: { type: 'module', name: 'catalog', entry: 'http://localhost:5171/remoteEntry.js' },
         cart: { type: 'module', name: 'cart', entry: 'http://localhost:5172/remoteEntry.js' },

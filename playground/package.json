@@ -2,11 +2,20 @@
   "name": "polka-playground",
   "private": true,
   "type": "module",
-  "workspaces": ["shell", "catalog", "cart"],
+  "workspaces": [
+    "contracts",
+    "shell",
+    "catalog",
+    "cart"
+  ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspaces --if-present",
     "start": "npm run build && node scripts/preview-all.mjs",
     "preview": "node scripts/preview-all.mjs",
-    "preview:no-catalog": "node scripts/preview-all.mjs shell cart"
+    "preview:no-catalog": "node scripts/preview-all.mjs shell cart",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }
