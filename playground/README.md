@@ -28,6 +28,8 @@ npm run typecheck          # проверить типы во всех трёх 
 
 Маршруты (урок 4): Shell владеет адресом и таблицей префиксов (`shell/src/router.ts`): `/catalog/*` → Каталог (сам понимает `/book/:sku`), `/cart` → страница Корзины (`mountPage`). Переходы — только через `navigate(to)`, который Shell передаёт вниз. Полоска внизу Shell показывает, совпадает ли адрес с тем, что смонтировано.
 
+Изоляция (урок 5): глобальный CSS — только `shell/public/polka.css` (reset, токены `--*`). Каталог — CSS Modules (`Catalog.module.css`), Корзина — `<style scoped>`. Ошибки: `RemoteBoundary` в Shell (со сбросом по `resetKey={path}`), во Vue — `app.config.errorHandler` в `cart/src/mount.ts`. Кнопки «💥» и «⚠» — учебные поломки.
+
 Контракт событий тот же, что в уроках 1–2: `catalog:add-to-cart` (cancelable, подтверждение через `preventDefault`), `cart:changed`, `cart:state-request`, BroadcastChannel `polka-cart`.
 
 `window.__polkaShellReact` — только диагностика для урока 3 (показывает, общий ли React у Shell и Каталога). В реальном коде этого нет.

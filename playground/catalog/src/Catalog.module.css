@@ -1,0 +1,15 @@
+/*
+ * CSS Modules: Vite превращает каждый класс в уникальное имя (например, _buy_x7f3a),
+ * поэтому эти правила физически не могут попасть на кнопки Shell или Корзины.
+ * Цвета берём из токенов Shell (var(--…)) — так Каталог выглядит частью «Полки», не владея её стилями.
+ */
+.buy {
+  background: var(--catalog);
+  color: #fff;
+  border-color: var(--catalog);
+}
+
+.danger {
+  border-color: var(--bad);
+  color: var(--bad);
+}

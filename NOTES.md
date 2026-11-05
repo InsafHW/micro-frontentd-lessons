@@ -21,6 +21,8 @@
 
 - 2026-11-05: по просьбе пользователя playground переписан на TypeScript. TS 6.0.3 (не 7: в 7.0 нет JS API, ломает vue-tsc). Контракты — пакет `contracts/` (`@polka/contracts`, только .d.ts), Shell объявляет remote в `shell/src/remotes.d.ts`. `npm run typecheck`; build = typecheck + vite build. Пробел: `new CustomEvent(name)` не связан с типом detail → аннотировать detail явно. Возможная тема урока: типизация контрактов между МФ (явные контракты vs @mf-types).
 
+- Урок 5, проверено вживую: CSS remote приходит <link> с 5171 и НЕ выгружается при unmount; глобальный `button{}` Каталога красит Shell и Vue-Корзину; без Vue errorHandler страница корзины молча исчезает; boundary залипает без resetKey; слушатель бросил → остальные слушатели вызваны, dispatchEvent вернул значение; через Shadow DOM проходят наследуемые свойства и CSS-переменные, селекторы нет. Стенд `assets/shadow-lab.js`.
+
 ## Сквозной пример: маркетплейс «Полка»
 Книжный магазин, 4 команды, смешанный стек:
 - **Shell** (команда платформы) — шапка, роутинг, авторизация, загрузка МФ
@@ -35,6 +37,6 @@
 2. ✅ Синхронизация состояния: владелец данных, проблема позднего подписчика, снапшот + события, вкладки (BroadcastChannel), бэкенд как источник истины
 3. ✅ Module Federation (host/remote/exposes/shared/singleton) на `playground/`
 4. ✅ Роутинг между МФ (Shell-роутер, navigate-контракт, Navigation API как страховка)
-5. Изоляция стилей и ошибок (error boundary, fallback)
+5. ✅ Изоляция стилей и ошибок (CSS Modules/scoped/Shadow DOM, токены; boundary+resetKey, Vue errorHandler)
 6. Когда НЕ нужны: цена, альтернативы (модульный монолит), разбор типичных вопросов собеседования
 Интерливинг: в каждом квизе 1–2 вопроса из прошлых уроков.

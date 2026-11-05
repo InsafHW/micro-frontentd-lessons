@@ -61,7 +61,7 @@ export default function App() {
       </header>
 
       {route?.mf === 'catalog' && (
-        <RemoteBoundary name="Каталог">
+        <RemoteBoundary name="Каталог" resetKey={path}>
           <Suspense fallback={<p className="muted">Загружаем Каталог…</p>}>
             {/* ↓ props по контракту CatalogProps: кто вошёл, где смонтирован, текущий путь и способ его сменить */}
             <Catalog user={user} basename="/catalog" path={path} navigate={navigate} />

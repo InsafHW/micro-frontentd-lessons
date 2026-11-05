@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Изоляция МФ</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main class="wide">
+<p class="kicker">Справочник · Микрофронтенды</p>
+<h1>Изоляция стилей и ошибок</h1>
+<p class="lede">Глобальное пишет только Shell. Каждый МФ изолирует свои стили и ловит свои ошибки. Shell — последняя линия.</p>
+
+<h2>Стили: три уровня</h2>
+<table>
+  <thead><tr><th>Уровень</th><th>Инструмент</th><th>Гарантия</th><th>Не спасает от</th></tr></thead>
+  <tbody>
+    <tr><td>Соглашение</td><td>Префикс команды, BEM: <code>.catalog-buy</code></td><td>Дисциплина</td><td>Забытого префикса, селекторов по тегу</td></tr>
+    <tr><td>Сборка</td><td><code>*.module.css</code>, Vue <code>&lt;style scoped&gt;</code>, CSS-in-JS</td><td>Уникальные классы / <code>data-v-…</code></td><td>Глобальных селекторов по тегу у <em>других</em> команд</td></tr>
+    <tr><td>Браузер</td><td>Shadow DOM</td><td>Селекторы не пересекают границу</td><td>Наследуемых свойств и CSS-переменных: они проходят (это плюс для токенов)</td></tr>
+  </tbody>
+</table>
+
+<h2>Правила</h2>
+<ul>
+  <li>Глобальный CSS (reset, токены <code>--*</code>) — только Shell. Команды берут цвета из токенов.</li>
+  <li>Никаких селекторов по тегу (<code>button</code>, <code>h2</code>) в коде команды.</li>
+  <li>CSS remote приходит <code>&lt;link&gt;</code> с его сервера и <strong>не выгружается</strong> при размонтировании.</li>
+  <li>Для Shadow DOM стили кладут внутрь shadow root: стили из <code>&lt;head&gt;</code> туда не попадут.</li>
+</ul>
+
+<h2>Ошибки: кто ловит</h2>
+<table>
+  <thead><tr><th>Где</th><th>Ловит</th></tr></thead>
+  <tbody>
+    <tr><td>Рендер React-дерева</td><td>Error boundary (в МФ и в Shell вокруг remote)</td></tr>
+    <tr><td>Обработчики событий, <code>setTimeout</code>, промисы</td><td>Boundary — нет. Свой <code>try/catch</code> + <code>window</code> <code>error</code> / <code>unhandledrejection</code></td></tr>
+    <tr><td>Vue-приложение из <code>mount()</code></td><td><code>app.config.errorHandler</code> внутри МФ: рендер, обработчики, хуки, <code>setup()</code>, watchers, директивы, transitions</td></tr>
+    <tr><td>Слушатель чужого события</td><td>Отчёт как uncaught. До отправителя не доходит, остальные слушатели вызываются</td></tr>
+    <tr><td>Загрузка remote</td><td><code>.catch()</code> у <code>import()</code> / boundary вокруг <code>lazy</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Код</h2>
+<pre><code><span class="c">// Shell: boundary сбрасывается при навигации</span>
+&lt;RemoteBoundary name="Каталог" resetKey={path}&gt;…&lt;/RemoteBoundary&gt;
+componentDidUpdate(prev) { if (this.state.error &amp;&amp; prev.resetKey !== this.props.resetKey) this.setState({ error: null }) }
+
+<span class="c">// Vue МФ: своя граница ошибок внутри mount()</span>
+app.config.errorHandler = (err, _i, info) =&gt; {
+  console.error(info, err)
+  queueMicrotask(() =&gt; { app.unmount(); el.innerHTML = '&lt;div class="fallback"&gt;…&lt;/div&gt;' })
+}</code></pre>
+
+<p class="aside">Источники: <a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends» → Styling</a> · <a href="https://vite.dev/guide/features.html">Vite: CSS Modules</a> · <a href="https://vuejs.org/api/sfc-css-features.html">Vue: scoped CSS</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM">MDN: Using shadow DOM</a> · <a href="https://react.dev/reference/react/Component">react.dev: Error Boundary</a> · <a href="https://vuejs.org/api/application.html">Vue: errorHandler</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">MDN: dispatchEvent</a>. Урок: <a href="../lessons/0005-isolation.html">5 · Изоляция</a>.</p>
+</main>
+</body>
+</html>

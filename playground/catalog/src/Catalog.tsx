@@ -1,5 +1,6 @@
 import React, { useState, type MouseEvent } from 'react'
 import type { AddToCartDetail, CatalogProps, Navigate } from '@polka/contracts'
+import styles from './Catalog.module.css'
 
 interface Book extends AddToCartDetail {
   about: string
@@ -28,6 +29,9 @@ export default function Catalog({ user, basename = '', path, navigate }: Catalog
   const current = path ?? localPath
   const sub = current.startsWith(basename) ? current.slice(basename.length) : current
   const [warning, setWarning] = useState('')
+  const [crash, setCrash] = useState(false)
+  // Учебная поломка (урок 5): ошибка во время рендера — её поймает error boundary в Shell.
+  if (crash) throw new Error('Каталог: учебная ошибка рендера')
 
   const add = (book: Book) => {
     const detail: AddToCartDetail = { sku: book.sku, title: book.title, price: book.price }
@@ -54,13 +58,20 @@ export default function Catalog({ user, basename = '', path, navigate }: Catalog
             <p><a {...link(basename)}>← Все книги</a></p>
             <h2>{book.title}</h2>
             <p>{book.about}</p>
-            <p><b>{book.price} ₽</b> <button onClick={() => add(book)}>В корзину</button></p>
+            <p><b>{book.price} ₽</b> <button className={styles.buy} onClick={() => add(book)}>В корзину</button></p>
             <p>
               <a {...link('/cart')}>Перейти в корзину →</a>
               {' '}
-              <button className="danger" title="Учебная поломка: смена адреса в обход Shell"
+              <button className={styles.danger} title="Учебная поломка: смена адреса в обход Shell"
                 onClick={() => history.pushState(null, '', '/cart')}>
                 ⚠ В корзину через history.pushState
+              </button>
+            </p>
+            <p className="muted">
+              Учебные поломки:{' '}
+              <button className={styles.danger} onClick={() => setCrash(true)}>💥 ошибка рендера</button>{' '}
+              <button className={styles.danger} onClick={() => { throw new Error('Каталог: учебная ошибка в обработчике') }}>
+                💥 ошибка в onClick
               </button>
             </p>
           </>
@@ -72,7 +83,7 @@ export default function Catalog({ user, basename = '', path, navigate }: Catalog
             {BOOKS.map((b) => (
               <li key={b.sku}>
                 <a {...link(`${basename}/book/${b.sku}`)}>{b.title}</a>
-                <span>{b.price} ₽ <button onClick={() => add(b)}>В корзину</button></span>
+                <span>{b.price} ₽ <button className={styles.buy} onClick={() => add(b)}>В корзину</button></span>
               </li>
             ))}
           </ul>

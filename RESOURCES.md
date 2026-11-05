@@ -25,6 +25,9 @@
 - [MDN: Navigation API](https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API) · [MDN: popstate](https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event)
   pushState не вызывает popstate; Navigation API (Baseline 2026) видит все переходы. Use for: роутинг между МФ.
 
+- [react.dev: Component → Error Boundary](https://react.dev/reference/react/Component) · [Vue: app.config.errorHandler](https://vuejs.org/api/application.html) · [Vue: scoped CSS](https://vuejs.org/api/sfc-css-features.html) · [Vite: CSS Modules](https://vite.dev/guide/features.html) · [MDN: Using shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM)
+  Что ловят границы ошибок и как изолируются стили. Use for: урок 5.
+
 ## Wisdom (Communities)
 
 - [Module Federation — GitHub Discussions](https://github.com/module-federation/core/discussions)

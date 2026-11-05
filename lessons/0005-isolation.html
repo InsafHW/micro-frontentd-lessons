@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Изоляция стилей и ошибок</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps > li { counter-increment: s; position: relative; padding-left: 2.1rem; margin-bottom: 1.3rem; }
+  .steps > li::before { content: counter(s); position: absolute; left: 0; top: .1rem; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--sans); font-size: .72rem; font-weight: 600; display: grid; place-items: center; }
+  .steps pre { margin: .5rem 0 .6rem; }
+  .predict { font-family: var(--sans); font-size: .78rem; color: var(--accent); font-weight: 600; }
+  details { border: 1px solid var(--rule); border-radius: 10px; padding: .9rem 1.1rem; background: var(--surface); margin: 1rem 0; }
+  summary { cursor: pointer; font-family: var(--sans); font-size: .85rem; font-weight: 600; }
+  details[open] summary { margin-bottom: .8rem; }
+</style>
+</head>
+<body>
+<main>
+
+<p class="kicker">Урок 5 · Микрофронтенды</p>
+<h1>Изоляция: чтобы чужой CSS и чужая ошибка не роняли твой МФ</h1>
+<p class="lede">Независимые команды работают на одной странице. После урока вы сможете объяснить, как стили одной команды ломают другую и как это предотвратить на трёх уровнях. А ещё — кто и где ловит ошибку, когда МФ падает.</p>
+
+<h2>Разминка: урок 4</h2>
+<p>Почему переход через <code>history.pushState()</code> в обход <code>navigate()</code> ломает страницу, и какое событие Navigation API это чинит? Ответьте, потом откройте.</p>
+<p class="reveal"><code>pushState()</code> не вызывает <code>popstate</code>, поэтому Shell не узнаёт о смене адреса: URL новый, а экран старый. <code>currententrychange</code> срабатывает на push, replace и «Назад». Это страховка, а основа — контракт <code>navigate()</code>.</p>
+
+<h2>Часть 1. Стили</h2>
+<p>«CSS как язык по своей природе глобален, наследуется и каскадируется. Традиционно в нём нет модулей, пространств имён и инкапсуляции»<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. На одной странице с чужими командами это значит: любой ваш селектор может попасть в чужую разметку.</p>
+
+<div class="callout">
+  <span class="label">Что я увидел на нашем стенде</span>
+  <p>Команда Каталога подключила «невинный» <code>button { background: green }</code>. Рантайм федерации добавил на страницу Shell <code>&lt;link&gt;</code> на CSS с сервера Каталога (5171). После этого позеленели <strong>кнопка «Войти» в Shell и кнопки на странице Корзины</strong>, а Корзина — другая команда и даже другой фреймворк. Хуже того: я ушёл на <code>/cart</code>, Каталог размонтировался, <strong>а его CSS остался</strong>. Стили не выгружаются вместе с микрофронтендом.</p>
+</div>
+
+<h3>Три уровня защиты</h3>
+<p>Статья перечисляет способы<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>. Полезно разложить их по тому, <em>кто</em> гарантирует изоляцию:</p>
+<table>
+  <thead><tr><th>Уровень</th><th>Как</th><th>Кто гарантирует</th><th>Цена</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Соглашение</strong></td><td>Префикс команды или BEM: <code>.catalog-buy</code></td><td>Дисциплина людей</td><td>Один забытый префикс, и утечка</td></tr>
+    <tr><td><strong>Инструмент сборки</strong></td><td>CSS Modules (<code>*.module.css</code><a class="cite" href="https://vite.dev/guide/features.html">[2]</a>), Vue <code>&lt;style scoped&gt;</code><a class="cite" href="https://vuejs.org/api/sfc-css-features.html">[3]</a>, CSS-in-JS</td><td>Сборщик: переписывает классы в уникальные</td><td>Почти ничего. Теги без классов (<code>button {…}</code>) не спасает</td></tr>
+    <tr><td><strong>Браузер</strong></td><td>Shadow DOM</td><td>Браузер: селекторы не пересекают границу<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM">[4]</a></td><td>Стили надо класть внутрь shadow root. То, что сборщик вешает в <code>&lt;head&gt;</code>, внутрь не попадёт</td></tr>
+  </tbody>
+</table>
+<p>Сейчас в playground Каталог на CSS Modules: класс <code>buy</code> в сборке стал <code>_buy_8hz6f_6</code>, и снаружи на него не попасть. Корзина на <code>&lt;style scoped&gt;</code>, где Vue добавляет атрибут вроде <code>data-v-f3f3eg9</code> к элементам и селекторам<a class="cite" href="https://vuejs.org/api/sfc-css-features.html">[3]</a>. Сама статья подытоживает: подход «не так уж важен», если разработчики могут писать стили независимо и уверены, что код предсказуемо поведёт себя после сборки в одно приложение<a class="cite" href="https://martinfowler.com/articles/micro-frontends.html">[1]</a>.</p>
+
+<h3>Что проходит через Shadow DOM</h3>
+<p>Сначала сделайте ставку: какие из трёх «чужих» правил изменят кнопку <em>внутри</em> Shadow DOM? Потом включайте по одному.</p>
+<shadow-lab></shadow-lab>
+<p class="reveal">Правило по селектору не проходит: это и есть инкапсуляция. Наследуемые свойства (<code>color</code>, <code>font-style</code>) проходят, ведь наследование идёт через границу. CSS-переменные тоже проходят: они наследуются, как и обычные наследуемые свойства<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties">[5]</a>. Я проверил все три случая в Chrome на этом стенде.</p>
+
+<div class="callout">
+  <span class="label">Отсюда правило для дизайн-системы</span>
+  <p><strong>Глобальный CSS пишет только Shell</strong>: базовый reset и <em>токены</em> — CSS-переменные вроде <code>--catalog</code> и <code>--bad</code>. Команды стилизуют только свою разметку изолированно и берут цвета из токенов. Токены проходят через любой уровень изоляции, поэтому «Полка» выглядит цельной, хотя никто не трогает чужие селекторы. Так устроен <a href="../playground/catalog/src/Catalog.module.css">Catalog.module.css</a>.</p>
+</div>
+
+<h2>Часть 2. Ошибки</h2>
+<p>Error boundary из урока 3 — не универсальная сетка. По документации React он ловит ошибки <em>во время рендера</em> дочерних компонентов и <strong>не</strong> ловит ошибки в обработчиках событий, в асинхронном коде (<code>setTimeout</code> и т. п.), при SSR и в самом boundary<a class="cite" href="https://react.dev/reference/react/Component">[6]</a>. А про Vue-приложение, смонтированное через <code>mount()</code>, React вообще ничего не знает.</p>
+
+<table>
+  <thead><tr><th>Где упало</th><th>Кто ловит</th><th>Что я увидел на стенде</th></tr></thead>
+  <tbody>
+    <tr><td>Рендер React-компонента remote</td><td>Error boundary в Shell</td><td>Заглушка «Каталог временно недоступен», остальное живо</td></tr>
+    <tr><td><code>onClick</code>, <code>setTimeout</code>, промисы</td><td>Никто: <code>window</code> <code>error</code> / <code>unhandledrejection</code> и ваш логгер</td><td>Интерфейс цел, в консоли uncaught error</td></tr>
+    <tr><td>Рендер Vue-приложения из <code>mount()</code></td><td>Сам МФ: <code>app.config.errorHandler</code> (рендер, обработчики, хуки, <code>setup()</code>, watchers…)<a class="cite" href="https://vuejs.org/api/application.html">[7]</a></td><td><strong>Без него страница корзины молча исчезла.</strong> С ним — заглушка</td></tr>
+    <tr><td>Слушатель события чужой команды</td><td>Браузер сообщает как uncaught. До отправителя ошибка не доходит<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">[8]</a></td><td>Остальные слушатели всё равно вызвались, <code>dispatchEvent</code> вернул значение</td></tr>
+    <tr><td>Remote не загрузился</td><td><code>.catch()</code> у <code>import()</code> или boundary (урок 3)</td><td><code>RUNTIME-008</code> и заглушка</td></tr>
+  </tbody>
+</table>
+
+<p>Ещё одна находка: после ошибки boundary «залипает» и показывает заглушку, пока его не размонтируют. Если пользователь со страницы книги перешёл на <code>/catalog</code>, Каталог остался «мёртвым». Поэтому в <a href="../playground/shell/src/RemoteBoundary.tsx">RemoteBoundary.tsx</a> появился <code>resetKey={path}</code>: при смене адреса boundary пробует отрисовать МФ заново.</p>
+
+<div class="callout">
+  <span class="label">Правило ошибок</span>
+  <p><strong>Каждый МФ сам отвечает за свои ошибки</strong>: свой errorHandler или boundary и свой логгер. <strong>Shell — последняя линия</strong>: boundary вокруг каждого remote, <code>.catch</code> на загрузку, сброс при навигации. Так падение одной команды превращается в заглушку на её месте, а не в белый экран.</p>
+</div>
+
+<h2>Лабораторная</h2>
+<p>Я обновил playground. Если ваши серверы работают, обновите страницу. Если нет: <code>cd playground &amp;&amp; npm start</code>.</p>
+<ol class="steps">
+  <li><b>Устройте утечку.</b> Создайте <code>catalog/src/leak.css</code> с <code>button { background: crimson; color: white }</code>, добавьте <code>import './leak.css'</code> в <code>catalog/src/Catalog.tsx</code> и выполните <code>npm run build -w catalog</code>. <span class="predict">Какие кнопки покраснеют? Что будет на /cart?</span> <span class="reveal">Все кнопки страницы, включая «Войти» в Shell и кнопки Корзины на Vue. На <code>/cart</code> они останутся красными, хотя Каталог размонтирован. Потом удалите файл и импорт и пересоберите Каталог.</span></li>
+  <li><b>Посмотрите на изоляцию.</b> В DevTools наведите на кнопку «В корзину». <span class="predict">Какой у неё класс?</span> <span class="reveal">Что-то вроде <code>_buy_8hz6f_6</code>: это CSS Modules. На странице корзины у кнопки «💥» будет атрибут <code>data-v-…</code>: это Vue scoped.</span></li>
+  <li><b>Две ошибки в Каталоге.</b> На странице книги нажмите «💥 ошибка в onClick», потом «💥 ошибка рендера». Затем «Каталог» в шапке. <span class="predict">Что сделает каждая и что вернёт Каталог?</span> <span class="reveal">Ошибка в onClick: интерфейс цел, ошибка только в консоли, boundary её не видит. Ошибка рендера: заглушка Каталога, шапка и бейдж живы. Переход на <code>/catalog</code> меняет <code>resetKey</code>, и Каталог оживает.</span></li>
+  <li><b>Уберите границу ошибок Vue.</b> На <code>/cart</code> нажмите «💥» и увидите заглушку. Теперь закомментируйте <code>app.config.errorHandler = …</code> в <code>cart/src/mount.ts</code>, выполните <code>npm run build -w cart</code> и повторите. <span class="predict">Поймает ли React-boundary Shell?</span> <span class="reveal">Нет. Страница корзины молча исчезнет: пустое место без сообщения, а React-boundary Shell ничего не заметит. Верните строку и пересоберите Корзину.</span></li>
+</ol>
+
+<h2>Проверьте себя</h2>
+<p>Последние два вопроса — из уроков 4 и 3.</p>
+
+<div class="quiz" data-quiz>
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt">Каталог подключил <code>button { background: green }</code>. Пользователь ушёл на <code>/cart</code>, Каталог размонтирован. Какие теперь кнопки у Корзины?</p>
+    <button data-key="a">Обычные: стили Каталога выгружены вместе с ним</button>
+    <button data-key="b">Обычные: Vue сам изолирует кнопки своих компонентов</button>
+    <button data-key="c">Зелёные: CSS остаётся на странице после размонтирования</button>
+    <button data-key="d">Зелёные, но только после полной перезагрузки страницы</button>
+    <p class="quiz-explain">Подключённый <code>&lt;link&gt;</code> никто не удаляет: размонтируется DOM-дерево МФ, а не его стили. <code>scoped</code> Корзины защищает от утечки <em>её</em> стилей наружу, но не защищает её разметку от чужих глобальных селекторов.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt">Shell задаёт <code>--catalog: teal</code> на <code>:root</code>. МФ отрисован внутри Shadow DOM и использует <code>var(--catalog)</code>. Что он увидит?</p>
+    <button data-key="a">Teal: переменные наследуются сквозь границу Shadow DOM</button>
+    <button data-key="b">Ничего: Shadow DOM блокирует любые внешние стили</button>
+    <button data-key="c">Teal, но только если shadow root открытый</button>
+    <button data-key="d">Ничего: переменные нужно объявлять внутри shadow root</button>
+    <p class="quiz-explain">Shadow DOM блокирует <em>селекторы</em>, а не наследование. CSS-переменные наследуются, поэтому токены дизайн-системы проходят внутрь. Это видно на стенде выше. Режим <code>open</code>/<code>closed</code> влияет на доступ из JavaScript, а не на стили.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="d">
+    <p class="quiz-prompt">Какую из этих ошибок поймает React error boundary в Shell?</p>
+    <button data-key="a">Ошибку в onClick кнопки внутри Каталога</button>
+    <button data-key="b">Ошибку рендера Vue-страницы, смонтированной через mount</button>
+    <button data-key="c">Ошибку в setTimeout внутри компонента Каталога</button>
+    <button data-key="d">Ошибку во время рендера компонента Каталога</button>
+    <p class="quiz-explain">Boundary ловит ошибки рендера своего React-дерева. Обработчики событий и асинхронный код он по документации не ловит<a class="cite" href="https://react.dev/reference/react/Component">[6]</a>. Vue-приложение для React — просто DOM-узел.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="b">
+    <p class="quiz-prompt">В Корзине обработчик <code>catalog:add-to-cart</code> бросил исключение <em>до</em> <code>preventDefault()</code>. Что произойдёт у Каталога?</p>
+    <button data-key="a">Исключение долетит до dispatchEvent в Каталоге</button>
+    <button data-key="b">dispatchEvent вернёт true: Каталог покажет предупреждение</button>
+    <button data-key="c">Браузер не вызовет остальных слушателей события</button>
+    <button data-key="d">Вся страница перезагрузится из-за необработанной ошибки</button>
+    <p class="quiz-explain">Исключения слушателей не доходят до вызывающего кода<a class="cite" href="https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent">[8]</a>, а остальные слушатели всё равно вызываются (я проверил). Подтверждения не было, значит <code>dispatchEvent</code> вернул <code>true</code>, и Каталог честно говорит «корзина недоступна». Паттерн подтверждения из урока 2 сам выдерживает падение владельца.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="c">
+    <p class="quiz-prompt"><span class="team shell">урок 4</span> Каталогу нужно перейти на свою подстраницу <code>/catalog/book/solaris</code>. Как правильно?</p>
+    <button data-key="a">history.pushState напрямую, Shell всё равно увидит</button>
+    <button data-key="b">Через location.href с полной перезагрузкой страницы</button>
+    <button data-key="c">Через navigate, который Shell передал в props</button>
+    <button data-key="d">Изменить window.name, Shell прочитает его позже</button>
+    <p class="quiz-explain">Даже свои подмаршруты Каталог меняет через <code>navigate</code>: история одна, адресом владеет Shell. Прямой <code>pushState</code> не вызывает <code>popstate</code>, а <code>location.href</code> перезагрузит страницу и все МФ.</p>
+  </div>
+
+  <div class="quiz-q" data-answer="a">
+    <p class="quiz-prompt"><span class="team shell">урок 3</span> Каталог импортирует CSS-файл. Как этот CSS попадает на страницу Shell?</p>
+    <button data-key="a">Рантайм добавил link на CSS с сервера Каталога</button>
+    <button data-key="b">Shell скопировал CSS Каталога при своей сборке</button>
+    <button data-key="c">CSS вшит в remoteEntry.js как строка JavaScript</button>
+    <button data-key="d">Браузер нашёл CSS по имени в node_modules</button>
+    <p class="quiz-explain">CSS — такой же ресурс remote, как его JS-чанки: он лежит в <code>dist</code> Каталога и грузится с 5171 во время работы. Shell при сборке о нём не знает. Поэтому новый CSS Каталога доезжает без пересборки Shell, в том числе и плохой.</p>
+  </div>
+  <p class="quiz-score" aria-live="polite"></p>
+</div>
+
+<h2>Тренировка для собеседования</h2>
+<p>60 секунд, вслух:</p>
+<p><em>«Как вы изолируете микрофронтенды друг от друга: стили и ошибки?»</em></p>
+<details>
+  <summary>Образец ответа</summary>
+  <p>Стили. CSS глобален, поэтому глобальные правила пишет только Shell: reset и дизайн-токены в CSS-переменных. Команды стилизуют свою разметку изолированно: CSS Modules в React, <code>scoped</code> во Vue, а где нужна гарантия браузера — Shadow DOM. Переменные проходят через все эти уровни, так что общий вид сохраняется. Важная деталь: CSS remote не выгружается при размонтировании, поэтому один глобальный селектор команды может сломать страницу всем, даже когда её МФ уже не на экране. Ошибки. Каждый МФ ловит свои: React — error boundary, Vue — <code>app.config.errorHandler</code> внутри <code>mount</code>. Shell — последняя линия: boundary вокруг каждого remote, <code>.catch</code> на загрузку и сброс boundary при навигации. Error boundary не ловит обработчики событий и асинхронный код, для них глобальный логгер на <code>window.onerror</code> и <code>unhandledrejection</code>. Исключение в слушателе чужого события не доходит до отправителя, а подтверждение через <code>preventDefault</code> позволяет отправителю заметить, что владелец не ответил.</p>
+</details>
+
+<div class="source">
+  <span class="label">Главный источник к уроку</span>
+  <p style="margin:0"><a href="https://martinfowler.com/articles/micro-frontends.html">Cam Jackson, «Micro Frontends»</a>, раздел <em>Styling</em>. Затем <a href="https://react.dev/reference/react/Component">react.dev: Catching rendering errors with an Error Boundary</a> и <a href="https://vuejs.org/api/application.html">Vue: app.config.errorHandler</a>.</p>
+</div>
+
+<p>Шпаргалки: <a href="../reference/isolation.html">Изоляция</a> · <a href="../reference/routing.html">Роутинг</a> · <a href="../reference/module-federation.html">Module Federation</a> · <a href="../reference/state-sync.html">Синхронизация состояния</a> · <a href="../reference/communication-channels.html">Каналы связи</a>.</p>
+
+<div class="ask">Интересно, как подключать стили внутрь Shadow DOM при сборке через Vite, или как устроить общий логгер ошибок для всех команд? Спросите преподавателя (агента) в чате.</div>
+
+<nav class="course-nav">
+  <a href="0004-routing.html">← Урок 4 · Роутинг</a>
+  <span>Дальше: Урок 6 · Когда микрофронтенды не нужны (скоро)</span>
+</nav>
+
+</main>
+<script src="../assets/shadow-lab.js"></script>
+<script src="../assets/quiz.js"></script>
+<script src="../assets/reveal.js"></script>
+</body>
+</html>

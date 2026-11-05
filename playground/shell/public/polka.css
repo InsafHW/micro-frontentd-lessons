@@ -16,6 +16,5 @@ button { font:inherit; font-size:13px; border:1px solid var(--rule); background:
 nav a { text-decoration:none; border-bottom:2px solid transparent; } nav a.on { border-color:var(--shell); }
 .mf h2 { font:600 18px Georgia, serif; margin:4px 0 8px; } .mf a { color:inherit; }
 .mf-cart.page { border-color:var(--cart); padding:20px 14px 12px; }
-button.danger { border-color:var(--bad); color:var(--bad); }
 .probe { font-size:12px; color:var(--soft); margin:16px 0 0; padding-top:10px; border-top:1px dashed var(--rule); }
 .probe-bad { color:var(--bad); font-weight:600; }
